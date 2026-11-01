@@ -63,4 +63,14 @@ describe('sanitizeSave', () => {
         expect(save.activeStar).toBeNull();
         expect(save.transfer?.candidates).toHaveLength(1);
     });
+
+    it('loads older saves at stadium tier 1 with no campaign, and repairs v4 fields', () => {
+        expect(sanitizeSave({ version: 3, level: 4 })).toMatchObject({ stadiumTier: 1, campaign: null });
+        expect(sanitizeSave({ stadiumTier: 9, campaign: { id: 'fanDrive', levelsLeft: 2, extended: true } })).toMatchObject({
+            stadiumTier: 5,
+            campaign: { id: 'fanDrive', levelsLeft: 2, extended: true }
+        });
+        expect(sanitizeSave({ campaign: { id: 'bogus', levelsLeft: 2 } }).campaign).toBeNull();
+        expect(sanitizeSave({ campaign: { id: 'fanDrive', levelsLeft: 0 } }).campaign).toBeNull();
+    });
 });

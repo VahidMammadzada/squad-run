@@ -1,11 +1,25 @@
-import { FITNESS_MAX, HAIR_COLORS, MAX_POPULARITY, MAX_ROSTER, SKILL_IDS, TRANSFER_SIZE, UPGRADE_IDS, type SkillId, type UpgradeId } from '../club/balance';
+import {
+    CAMPAIGN_IDS,
+    FITNESS_MAX,
+    HAIR_COLORS,
+    MAX_POPULARITY,
+    MAX_ROSTER,
+    MAX_STADIUM_TIER,
+    SKILL_IDS,
+    TRANSFER_SIZE,
+    UPGRADE_IDS,
+    type CampaignId,
+    type SkillId,
+    type UpgradeId
+} from '../club/balance';
 import { migratedFans } from '../club/fans';
+import type { Campaign } from '../club/office';
 import type { StarPlayer } from '../club/stars';
 import { maxLevel } from '../club/upgrades';
 import { DEFAULT_KIT, KITS } from '../data/kits';
 
 /** Bump when the shape changes, and teach sanitizeSave to read the old shape. */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export interface SaveData {
     version: number;
@@ -29,6 +43,10 @@ export interface SaveData {
     transfer: TransferList | null;
     /** Seed for the next generated transfer list. */
     scoutSeed: number;
+    /** Stadium tier 1-5: merch bonus and a bigger 3D stadium. */
+    stadiumTier: number;
+    /** Running marketing campaign, if any. */
+    campaign: Campaign | null;
 }
 
 export interface TransferList {
@@ -54,7 +72,9 @@ export function defaultSave(): SaveData {
         roster: [],
         activeStar: null,
         transfer: null,
-        scoutSeed: 1
+        scoutSeed: 1,
+        stadiumTier: 1,
+        campaign: null
     };
 }
 
@@ -104,6 +124,16 @@ export function sanitizeSave(raw: unknown): SaveData {
         const t = r.transfer as Record<string, unknown>;
         const candidates = sanitizeStars(t.candidates, TRANSFER_SIZE);
         if (candidates.length > 0) save.transfer = { refreshedAtLevel: wholeNumber(t.refreshedAtLevel, 1, 1), candidates };
+    }
+
+    // v4: stadium and marketing. Older saves start at tier 1 with no campaign.
+    save.stadiumTier = Math.min(MAX_STADIUM_TIER, wholeNumber(r.stadiumTier, 1, 1));
+    if (typeof r.campaign === 'object' && r.campaign !== null) {
+        const c = r.campaign as Record<string, unknown>;
+        const levelsLeft = wholeNumber(c.levelsLeft, 0, 0);
+        if (CAMPAIGN_IDS.includes(c.id as CampaignId) && levelsLeft > 0) {
+            save.campaign = { id: c.id as CampaignId, levelsLeft, extended: c.extended === true };
+        }
     }
     return save;
 }

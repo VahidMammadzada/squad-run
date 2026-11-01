@@ -214,7 +214,12 @@ Each milestone ships on its own, and the game stays fully playable after each.
 - Scout booth (transfer list).
 - Fitness, injuries, Doctor booth with "Heal now ▶".
 
-**M3: Stadium and marketing**
+**M3: Stadium and marketing** — *built.* Decisions and changes from the text below:
+- Stadium tiers give **income and looks**, not booth unlocks (all booths were already open) and no fan cap: +25% merch per tier above 1; tiers 3/4/5 need 500/1200/2500 fans; prices 300/800/1600/3000.
+- The in-run camera barely shows anything above the stands, so the most visible tier change is the stands themselves: club-colour seats from tier 2 and more fans in club shirts per tier; club boards from tier 4. Upper tier, roof and floodlights add detail in the distance.
+- Three campaigns (Fan Drive +50% fans, Merch Promo x2 merch, Talent Buzz: an immediate new scout list with +1 popularity), 3 completed levels each, one at a time, rewarded "EXTEND +2" once per campaign.
+- Both live in one OFFICE tab (six tabs in total). Save v4.
+
 - Stadium tiers with 3D changes and booth unlocks.
 - Marketing campaigns with "Extend ▶".
 

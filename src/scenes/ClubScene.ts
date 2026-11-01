@@ -3,6 +3,7 @@ import { TEX } from '../art/textures';
 import { Sfx } from '../audio/Sfx';
 import { MERCH_DOUBLE_MIN, UPGRADES, type UpgradeDef } from '../club/balance';
 import { merchCap, merchPerLevel } from '../club/merch';
+import { canUpgradeStadium, isActive, merchMultiplier, stadiumMerchBonus } from '../club/office';
 import { isMaxed, maxLevel, nextPrice } from '../club/upgrades';
 import { COLORS, GAME_WIDTH } from '../config';
 import { getKit } from '../data/kits';
@@ -10,13 +11,15 @@ import { REWARD_IDS } from '../game/adPolicy';
 import { Progress } from '../state/Progress';
 import { createRewardedButton } from '../ui/rewardedButton';
 import { createButton, drawBackdrop, drawCandy, drawChip, textStyle } from '../ui/widgets';
-import { buildDoctor, buildScout, buildSquad, CONTENT_Y, type Booth, type ClubHost } from './clubStars';
+import { buildOffice } from './clubOffice';
+import { buildDoctor, buildScout, buildSquad } from './clubStars';
+import { CONTENT_Y, type Booth, type ClubHost } from './clubUi';
 import { startNextLevel } from './nextLevel';
 
 const INK = '#1b2a5c';
-const TAB_W = 128;
+const TAB_W = 108;
 const TAB_H = 132;
-const TAB_GAP = 8;
+const TAB_GAP = 6;
 const TAB_Y = 340;
 const ROW_W = 640;
 const ROW_H = 118;
@@ -69,7 +72,8 @@ export class ClubScene extends Phaser.Scene {
             ['scout', 'SCOUT', this.add.image(0, -18, TEX.scout).setScale(0.9)],
             ['doctor', 'DOCTOR', this.add.image(0, -18, TEX.medic).setScale(0.85)],
             ['training', 'TRAINING', this.add.image(0, -18, TEX.cone).setScale(0.9)],
-            ['merch', 'MERCH', this.add.image(0, -18, TEX.shirt).setTint(getKit(Progress.data.selectedKit).shirt).setScale(0.9)]
+            ['merch', 'MERCH', this.add.image(0, -18, TEX.shirt).setTint(getKit(Progress.data.selectedKit).shirt).setScale(0.9)],
+            ['office', 'OFFICE', this.add.image(0, -18, TEX.office).setScale(0.85)]
         ];
         const left = cx - (tabs.length * TAB_W + (tabs.length - 1) * TAB_GAP) / 2 + TAB_W / 2;
         tabs.forEach(([booth, label, icon], i) => this.createBooth(booth, left + i * (TAB_W + TAB_GAP), label, icon));
@@ -98,7 +102,7 @@ export class ClubScene extends Phaser.Scene {
 
     private createBooth(booth: Booth, x: number, label: string, icon: Phaser.GameObjects.Image): void {
         const bg = this.add.graphics();
-        const name = this.add.text(0, 40, label, textStyle(label.length > 6 ? 21 : 24)).setOrigin(0.5);
+        const name = this.add.text(0, 40, label, textStyle(label.length > 6 ? 18 : 21)).setOrigin(0.5);
         const badge = this.add.container(TAB_W / 2 - 14, -TAB_H / 2 + 6);
         const container = this.add.container(x, TAB_Y, [bg, icon, name, badge]).setSize(TAB_W, TAB_H);
         container.setInteractive({ useHandCursor: true });
@@ -130,7 +134,7 @@ export class ClubScene extends Phaser.Scene {
     }
 
     private refresh(): void {
-        const { coins, fans, merchPending, roster } = Progress.data;
+        const { coins, fans, merchPending, roster, stadiumTier } = Progress.data;
         this.coinText.setText(String(coins));
         this.fanText.setText(String(fans));
 
@@ -138,7 +142,8 @@ export class ClubScene extends Phaser.Scene {
         const injured = roster.filter((s) => s.injuredLevels > 0).length;
         const badges: Partial<Record<Booth, string>> = {
             merch: merchPending > 0 ? `+${merchPending}` : undefined,
-            doctor: injured > 0 ? String(injured) : undefined
+            doctor: injured > 0 ? String(injured) : undefined,
+            office: canUpgradeStadium(stadiumTier, coins, fans) === 'ok' ? '!' : undefined
         };
 
         for (const [booth, { bg, container, badge }] of this.boothCards) {
@@ -178,6 +183,9 @@ export class ClubScene extends Phaser.Scene {
                 break;
             case 'merch':
                 this.buildMerch(this.content);
+                break;
+            case 'office':
+                buildOffice(host, this.content);
                 break;
         }
     }
@@ -253,7 +261,13 @@ export class ClubScene extends Phaser.Scene {
 
     private buildMerch(root: Phaser.GameObjects.Container): void {
         const cx = GAME_WIDTH / 2;
-        const { fans, merchPending } = Progress.data;
+        const { fans, merchPending, stadiumTier, campaign } = Progress.data;
+        const mult = merchMultiplier(stadiumTier, campaign);
+        // e.g. "stadium +50%, promo x2", so players see what their upgrades pay.
+        const boosts = [
+            stadiumTier > 1 ? `stadium +${Math.round((stadiumMerchBonus(stadiumTier) - 1) * 100)}%` : '',
+            isActive(campaign, 'merchPromo') ? 'promo x2' : ''
+        ].filter(Boolean);
 
         const card = this.add.graphics();
         const top = CONTENT_Y + 20;
@@ -269,9 +283,10 @@ export class ClubScene extends Phaser.Scene {
         root.add(amount);
         root.add(
             this.add
-                .text(cx, top + 190, `+${merchPerLevel(fans)} per level from your fans (holds up to ${merchCap(fans)})`, textStyle(22, '#cfe3ff', false))
+                .text(cx, top + 182, `+${merchPerLevel(fans, mult)} per level from your fans (holds up to ${merchCap(fans, mult)})`, textStyle(22, '#cfe3ff', false))
                 .setOrigin(0.5)
         );
+        if (boosts.length > 0) root.add(this.add.text(cx, top + 210, boosts.join(', '), textStyle(20, '#7dff8a', false)).setOrigin(0.5));
 
         if (merchPending > 0) {
             const double =

@@ -1,5 +1,16 @@
-import { HEAL_PRICE, REST_PRICE, TRANSFER_REFRESH_LEVELS, FITNESS_MAX, type UpgradeId } from '../club/balance';
+import { FITNESS_MAX, HEAL_PRICE, REST_PRICE, TRANSFER_REFRESH_LEVELS, type CampaignId, type UpgradeId } from '../club/balance';
 import { accrueMerch } from '../club/merch';
+import {
+    campaignDef,
+    canStartCampaign,
+    canUpgradeStadium,
+    extendCampaign,
+    isActive,
+    merchMultiplier,
+    newCampaign,
+    stadiumPrice,
+    tickCampaign
+} from '../club/office';
 import { canBuy, nextPrice } from '../club/upgrades';
 import { canSign, generateCandidates, releaseRefund, starPrice, tickRun, type StarPlayer } from '../club/stars';
 import { getKit } from '../data/kits';
@@ -32,8 +43,10 @@ export const Progress = {
         data.level += 1;
         data.coins += Math.max(0, coinsEarned);
         data.fans += Math.max(0, fansEarned);
-        data.merchPending = accrueMerch(data.merchPending, data.fans);
+        data.merchPending = accrueMerch(data.merchPending, data.fans, merchMultiplier(data.stadiumTier, data.campaign));
         data.roster = tickRun(data.roster, data.activeStar, false);
+        // Campaigns count completed levels only, after this level's boost applied.
+        data.campaign = tickCampaign(data.campaign);
         const newBest = goals > data.bestScore;
         if (newBest) data.bestScore = goals;
         // The score sent to YouTube is fans, and must match the fans in the save.
@@ -69,7 +82,8 @@ export const Progress = {
 
     /** New transfer list now (rewarded refresh, or when the old one is stale). */
     refreshTransfer(): void {
-        data.transfer = { refreshedAtLevel: data.level, candidates: generateCandidates(data.scoutSeed, data.level) };
+        const popBonus = isActive(data.campaign, 'talentBuzz') ? 1 : 0;
+        data.transfer = { refreshedAtLevel: data.level, candidates: generateCandidates(data.scoutSeed, data.level, popBonus) };
         data.scoutSeed++;
         void this.save();
     },
@@ -127,6 +141,34 @@ export const Progress = {
         if (!star || star.fitness >= FITNESS_MAX || data.coins < REST_PRICE) return false;
         data.coins -= REST_PRICE;
         star.fitness = FITNESS_MAX;
+        void this.save();
+        return true;
+    },
+
+    /** Buys the next stadium tier. */
+    upgradeStadium(): boolean {
+        if (canUpgradeStadium(data.stadiumTier, data.coins, data.fans) !== 'ok') return false;
+        data.coins -= stadiumPrice(data.stadiumTier + 1);
+        data.stadiumTier++;
+        void this.save();
+        return true;
+    },
+
+    /** Launches a marketing campaign (one at a time). Talent Buzz brings a new scout list at once. */
+    startCampaign(id: CampaignId): boolean {
+        if (!canStartCampaign(data.campaign, data.coins, id)) return false;
+        data.coins -= campaignDef(id).price;
+        data.campaign = newCampaign(id);
+        if (id === 'talentBuzz') this.refreshTransfer();
+        void this.save();
+        return true;
+    },
+
+    /** Rewarded: the running campaign lasts 2 more levels (once per campaign). */
+    extendCampaign(): boolean {
+        const extended = extendCampaign(data.campaign);
+        if (!extended) return false;
+        data.campaign = extended;
         void this.save();
         return true;
     },

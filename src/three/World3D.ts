@@ -90,7 +90,7 @@ export class World3D {
     private readonly s = new THREE.Vector3();
     private readonly up = new THREE.Vector3(0, 1, 0);
 
-    constructor(phaserScene: Phaser.Scene, spec: LevelSpec, kitColor: number, goalDistance: number, options: { crowdFill?: number; leaderLook?: { hair: number; socks: number } } = {}) {
+    constructor(phaserScene: Phaser.Scene, spec: LevelSpec, kitColor: number, goalDistance: number, options: { crowdFill?: number; leaderLook?: { hair: number; socks: number }; stadiumTier?: number } = {}) {
         this.tweens = phaserScene.tweens;
         this.goalDist = spec.length + goalDistance;
         const goalZ = -units(this.goalDist);
@@ -102,7 +102,7 @@ export class World3D {
         sun.position.set(4, 10, 6);
         this.scene.add(sun);
 
-        this.buildStadium(goalZ, options.crowdFill);
+        this.buildStadium(goalZ, options.crowdFill, options.stadiumTier ?? 1, kitColor);
         this.buildFinishLine(-units(spec.length));
         this.ballMaterial = new THREE.MeshLambertMaterial({ map: ballTexture() });
 
@@ -142,7 +142,11 @@ export class World3D {
         this.scene.add(this.squad.group, this.particles.mesh);
     }
 
-    private buildStadium(goalZ: number, crowdFill?: number): void {
+    /**
+     * Pitch, boards and stands. The club's stadium tier grows it: deeper stands
+     * (2), an upper tier (3), a roof in the club colour (4), floodlights (5).
+     */
+    private buildStadium(goalZ: number, crowdFill: number | undefined, tier: number, clubColor: number): void {
         const start = 25;
         const end = goalZ - 20;
         const length = start - end;
@@ -159,11 +163,16 @@ export class World3D {
         this.scene.add(pitch);
 
         // Advertising boards facing the pitch, then a sloped stand full of fans.
-        const crowd = crowdTexture(crowdFill);
-        const standWidth = 7;
+        // A bigger stadium wears the club's colours: seats from tier 2, then more and more fans in club shirts.
+        const clubShare = [0, 0, 0.2, 0.5, 0.7, 0.85][Math.min(5, tier)];
+        const crowd = crowdTexture({ fill: crowdFill, club: tier >= 2 ? clubColor : undefined, clubShare });
+        const standWidth = tier >= 2 ? 9 : 7;
         const tilt = 0.55;
+        // Where the lower stand's back edge ends up; upper tiers build out from here.
+        const lowerOuterX = PITCH_HALF + 1.5 + standWidth * Math.cos(tilt);
+        const lowerTopY = 0.2 + standWidth * Math.sin(tilt);
         for (const side of [-1, 1]) {
-            const boardTex = boardTexture();
+            const boardTex = boardTexture(tier >= 4 ? clubColor : undefined);
             // Flip the right-hand boards so their text doesn't read mirrored.
             boardTex.repeat.set((side === -1 ? 1 : -1) * (length / 12), 1);
             const board = new THREE.Mesh(new THREE.PlaneGeometry(length, 0.55).rotateY((-side * Math.PI) / 2), new THREE.MeshBasicMaterial({ map: boardTex }));
@@ -176,7 +185,9 @@ export class World3D {
             stand.rotation.z = side * tilt;
             stand.position.set(side * (PITCH_HALF + 1.5 + (standWidth / 2) * Math.cos(tilt)), 0.2 + (standWidth / 2) * Math.sin(tilt), midZ);
             this.scene.add(board, stand);
+            if (tier >= 3) this.buildUpperTier(side, crowd, length, midZ, lowerOuterX, lowerTopY, tier >= 4 ? clubColor : null);
         }
+        if (tier >= 5) this.buildFloodlights(lowerOuterX + 2, start - 12, goalZ - 2);
 
         // A stand behind the goal, then a pale city skyline fading into the sky.
         const backTex = crowd.clone();
@@ -194,6 +205,62 @@ export class World3D {
             const tower = new THREE.Mesh(new THREE.BoxGeometry(w, h, 2), skylineMat);
             tower.position.set(-34 + i * 4 + ((i * 17) % 3), h / 2 - 0.5, goalZ - 30 - ((i * 7) % 4));
             this.scene.add(tower);
+        }
+    }
+
+    /** A steeper upper stand above the lower one; with `roofColor`, a roof over it. */
+    private buildUpperTier(side: number, crowd: THREE.Texture, length: number, midZ: number, baseX: number, baseY: number, roofColor: number | null): void {
+        const width = 6;
+        const tilt = 0.8;
+        const lift = 0.9;
+        // Dark facia between the two tiers.
+        const facia = new THREE.Mesh(new THREE.BoxGeometry(0.4, lift + 0.2, length), new THREE.MeshLambertMaterial({ color: COLORS.ink }));
+        facia.position.set(side * baseX, baseY + lift / 2, midZ);
+        const tex = crowd.clone();
+        tex.repeat.set(1, length / 6);
+        tex.needsUpdate = true;
+        const upper = new THREE.Mesh(new THREE.PlaneGeometry(width, length).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: tex }));
+        upper.rotation.z = side * tilt;
+        upper.position.set(side * (baseX + (width / 2) * Math.cos(tilt)), baseY + lift + (width / 2) * Math.sin(tilt), midZ);
+        this.scene.add(facia, upper);
+        if (roofColor === null) return;
+
+        // Cantilevered roof in the club colour, with a white trim along its front edge.
+        const topX = baseX + width * Math.cos(tilt);
+        const topY = baseY + lift + width * Math.sin(tilt) + 1.2;
+        const roof = new THREE.Mesh(new THREE.BoxGeometry(7, 0.25, length), new THREE.MeshLambertMaterial({ color: roofColor }));
+        roof.rotation.z = side * -0.12;
+        roof.position.set(side * (topX - 2.5), topY, midZ);
+        const trim = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.45, length), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+        trim.position.set(side * (topX - 6), topY - 0.35, midZ);
+        this.scene.add(roof, trim);
+    }
+
+    /** Four floodlight towers at the stadium corners, lamps glowing towards the pitch. */
+    private buildFloodlights(x: number, nearZ: number, farZ: number): void {
+        const poleMat = new THREE.MeshLambertMaterial({ color: 0xdfe6f0 });
+        const frameMat = new THREE.MeshLambertMaterial({ color: COLORS.ink });
+        const lampMat = new THREE.MeshBasicMaterial({ color: 0xfffbe0, fog: false });
+        const height = 16;
+        for (const side of [-1, 1]) {
+            for (const z of [nearZ, farZ]) {
+                const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.4, height, 8), poleMat);
+                pole.position.set(side * x, height / 2, z);
+                const head = new THREE.Group();
+                const frame = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2, 0.3), frameMat);
+                head.add(frame);
+                for (let r = 0; r < 2; r++) {
+                    for (let c = 0; c < 3; c++) {
+                        const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.7, 0.2), lampMat);
+                        lamp.position.set(-1 + c, -0.45 + r * 0.9, 0.2);
+                        head.add(lamp);
+                    }
+                }
+                head.position.set(side * x, height + 0.8, z);
+                // Turn the lamps to face the middle of the pitch, tipped down a little.
+                head.lookAt(0, 0, (nearZ + farZ) / 2);
+                this.scene.add(pole, head);
+            }
         }
     }
 

@@ -178,3 +178,45 @@ describe('Progress stars', () => {
         expect(Progress.restStar(id)).toBe(false);
     });
 });
+
+describe('Progress office', () => {
+    const fresh = (over: Record<string, unknown> = {}) => freshProgress({ version: 4, level: 5, coins: 5000, fans: 0, ...over });
+
+    it('upgrades the stadium, respecting the fan gate', async () => {
+        const Progress = await fresh();
+        expect(Progress.upgradeStadium()).toBe(true);
+        expect(Progress.data).toMatchObject({ stadiumTier: 2, coins: 4700 });
+        expect(Progress.upgradeStadium()).toBe(false);
+        expect(Progress.data.stadiumTier).toBe(2);
+    });
+
+    it('runs a campaign for 3 completed levels; failed runs do not count', async () => {
+        const Progress = await fresh();
+        expect(Progress.startCampaign('merchPromo')).toBe(true);
+        expect(Progress.startCampaign('fanDrive')).toBe(false);
+        Progress.failRun(false);
+        Progress.completeLevel(0, 0, 0);
+        expect(Progress.data.campaign?.levelsLeft).toBe(2);
+        expect(Progress.extendCampaign()).toBe(true);
+        expect(Progress.extendCampaign()).toBe(false);
+        for (let i = 0; i < 4; i++) Progress.completeLevel(0, 0, 0);
+        expect(Progress.data.campaign).toBeNull();
+    });
+
+    it('Merch Promo and the stadium multiply merch takings', async () => {
+        const Progress = await fresh({ fans: 1000, stadiumTier: 3 });
+        Progress.startCampaign('merchPromo');
+        Progress.completeLevel(0, 0, 0);
+        // 1000 fans × 4% = 40, × 1.5 stadium × 2 promo = 120.
+        expect(Progress.data.merchPending).toBe(120);
+    });
+
+    it('Talent Buzz brings a new, better scout list at once', async () => {
+        const Progress = await fresh();
+        const before = Progress.transferList();
+        Progress.startCampaign('talentBuzz');
+        const after = Progress.transferList();
+        expect(after).not.toBe(before);
+        expect(after.candidates[0].popularity).toBe(2);
+    });
+});

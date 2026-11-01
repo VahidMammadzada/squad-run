@@ -22,6 +22,8 @@ export const TEX = {
     scout: 'scout',
     /** Red cross: the Doctor booth. */
     medic: 'medic',
+    /** Megaphone: the Office booth (marketing). */
+    office: 'office',
     shirt: 'shirt',
     flag: 'flag',
     pitch: 'pitch'
@@ -111,6 +113,16 @@ export function createPlaceholderTextures(scene: Phaser.Scene): void {
         g.fillStyle(0xffffff).fillRoundedRect(4, 4, 52, 50, 12);
         g.fillStyle(COLORS.gateBad).fillRoundedRect(23, 12, 14, 34, 4);
         g.fillStyle(COLORS.gateBad).fillRoundedRect(13, 22, 34, 14, 4);
+    });
+
+    make(TEX.office, 64, 56, (g) => {
+        // Megaphone pointing right: handle, body cone, bell rim, sound lines.
+        g.fillStyle(COLORS.ink).fillRoundedRect(10, 30, 10, 20, 4);
+        g.fillStyle(COLORS.ink).fillPoints([new Phaser.Math.Vector2(4, 18), new Phaser.Math.Vector2(42, 4), new Phaser.Math.Vector2(42, 48), new Phaser.Math.Vector2(4, 34)], true);
+        g.fillStyle(COLORS.gateBad).fillPoints([new Phaser.Math.Vector2(7, 20), new Phaser.Math.Vector2(40, 8), new Phaser.Math.Vector2(40, 44), new Phaser.Math.Vector2(7, 32)], true);
+        g.fillStyle(0xffffff).fillRoundedRect(38, 4, 8, 44, 4);
+        g.fillStyle(0xffffff, 0.45).fillRect(10, 20, 26, 4);
+        g.lineStyle(4, COLORS.ink).lineBetween(52, 16, 60, 10).lineBetween(53, 26, 62, 26).lineBetween(52, 36, 60, 42);
     });
 
     // White football shirt with a navy outline; tinted with the kit colour.

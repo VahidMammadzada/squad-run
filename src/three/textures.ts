@@ -105,23 +105,39 @@ export function skyTexture(): THREE.CanvasTexture {
     });
 }
 
-/**
- * Rows of seats with a colourful crowd; rows run along the texture's v axis.
- * `fill` (0..1) is the share of seats taken; it grows with the club's fans.
- */
-export function crowdTexture(fill = 0.85): THREE.CanvasTexture {
+/** How the club's stadium tier dresses the stands in its colours. */
+export interface CrowdStyle {
+    /** Share of seats taken (0..1); grows with the club's fans. */
+    fill?: number;
+    /** Club kit colour; with it, seats are painted in the club colour. */
+    club?: number;
+    /** Share of fans wearing the club colour (0..1). */
+    clubShare?: number;
+}
+
+/** Mixes a hex colour toward white by `t` (0..1), as a CSS colour. */
+function lighten(hex: number, t: number): string {
+    const c = new THREE.Color(hex).lerp(new THREE.Color(0xffffff), t);
+    return `#${c.getHexString()}`;
+}
+
+/** Rows of seats with a colourful crowd; rows run along the texture's v axis. */
+export function crowdTexture({ fill = 0.85, club, clubShare = 0 }: CrowdStyle = {}): THREE.CanvasTexture {
     const shirts = ['#ff3b3b', '#ffd21f', '#ffffff', '#ff9f1a', '#ff5c9e'];
+    const seats = club === undefined ? ['#4aa3ff', '#6fb8ff'] : [lighten(club, 0.15), lighten(club, 0.4)];
+    const clubShirts = club === undefined ? [] : [lighten(club, 0), lighten(club, 0), '#ffffff'];
     const tex = canvasTexture(256, 256, (ctx) => {
         const rows = 8;
         const w = 256 / rows;
         for (let r = 0; r < rows; r++) {
-            ctx.fillStyle = r % 2 === 0 ? '#4aa3ff' : '#6fb8ff';
+            ctx.fillStyle = seats[r % 2];
             ctx.fillRect(r * w, 0, w, 256);
             ctx.fillStyle = 'rgba(27,42,92,0.18)';
             ctx.fillRect(r * w + w - 4, 0, 4, 256);
             for (let y = 10; y < 256; y += 22) {
                 if (Math.random() >= fill) continue;
-                ctx.fillStyle = shirts[Math.floor(Math.random() * shirts.length)];
+                const palette = clubShirts.length > 0 && Math.random() < clubShare ? clubShirts : shirts;
+                ctx.fillStyle = palette[Math.floor(Math.random() * palette.length)];
                 ctx.beginPath();
                 ctx.arc(r * w + w / 2 + (Math.random() - 0.5) * 4, y + (Math.random() - 0.5) * 4, 8, 0, Math.PI * 2);
                 ctx.fill();
@@ -133,14 +149,25 @@ export function crowdTexture(fill = 0.85): THREE.CanvasTexture {
 }
 
 /** Pitch-side advertising boards: made-up slogans on candy-coloured blocks. */
-export function boardTexture(): THREE.CanvasTexture {
-    const blocks: [string, string, string][] = [
-        ['#2f8cff', '#ffffff', 'SQUAD RUN'],
-        ['#ffd21f', '#1b2a5c', 'GOAL!'],
-        ['#ff3b3b', '#ffffff', 'RUN!'],
-        ['#ffffff', '#2f8cff', '⚽ PLAY'],
-        ['#ff9f1a', '#ffffff', 'WIN!']
-    ];
+export function boardTexture(club?: number): THREE.CanvasTexture {
+    // A big club (stadium tier 4+) fills its boards with its own colours.
+    const c = club === undefined ? '' : lighten(club, 0);
+    const blocks: [string, string, string][] =
+        club === undefined
+            ? [
+                  ['#2f8cff', '#ffffff', 'SQUAD RUN'],
+                  ['#ffd21f', '#1b2a5c', 'GOAL!'],
+                  ['#ff3b3b', '#ffffff', 'RUN!'],
+                  ['#ffffff', '#2f8cff', '⚽ PLAY'],
+                  ['#ff9f1a', '#ffffff', 'WIN!']
+              ]
+            : [
+                  [c, '#ffffff', 'SQUAD RUN FC'],
+                  ['#ffffff', c, 'HOME OF'],
+                  [c, '#ffd21f', 'CHAMPIONS'],
+                  ['#ffffff', c, 'GO SQUAD!'],
+                  ['#1b2a5c', '#ffffff', 'WIN!']
+              ];
     const bw = 256;
     const tex = canvasTexture(bw * blocks.length, 64, (ctx) => {
         blocks.forEach(([bg, fg, text], i) => {

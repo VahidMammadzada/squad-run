@@ -3,9 +3,10 @@ import { START_SQUAD } from '../config';
 import { KITS } from '../data/kits';
 import { generateLevel } from '../game/levelGen';
 import { COINS_PER_GOAL, goalsFor } from '../game/scoring';
-import { REST_PRICE, STAR_FAN_GATES, TRANSFER_REFRESH_LEVELS, UPGRADE_IDS, type UpgradeId } from './balance';
+import { MAX_STADIUM_TIER, REST_PRICE, STADIUM_FAN_GATES, STAR_FAN_GATES, TRANSFER_REFRESH_LEVELS, UPGRADE_IDS, type UpgradeId } from './balance';
 import { fansForLevel } from './fans';
 import { accrueMerch } from './merch';
+import { merchMultiplier, stadiumGate, stadiumPrice } from './office';
 import { runModifiers } from './runModifiers';
 import { canSign, generateCandidates, isTired, starPrice, tickRun, type StarPlayer } from './stars';
 import { nextPrice } from './upgrades';
@@ -29,6 +30,8 @@ function simulate(levels: number) {
     let candidates: StarPlayer[] = [];
     let firstStarAt: number | null = null;
     let topStarUnlockedAt: number | null = null;
+    let tier = 1;
+    const gateOpenAt: Record<number, number | null> = { 3: null, 5: null };
 
     for (let level = 1; level <= levels; level++) {
         if ((level - 1) % TRANSFER_REFRESH_LEVELS === 0) candidates = generateCandidates(level, level);
@@ -39,11 +42,12 @@ function simulate(levels: number) {
         const goals = goalsFor(endSquad(level, mods.startSquadBonus), level, mods.perGoalDelta);
         const earnedFans = fansForLevel(goals, mods.fanMult);
         fans += earnedFans;
-        merch = accrueMerch(merch, fans);
+        merch = accrueMerch(merch, fans, merchMultiplier(tier, null));
         coins += pickups + goals * COINS_PER_GOAL + merch;
         merch = 0;
         roster = tickRun(roster, club.activeStar, false);
         if (topStarUnlockedAt === null && fans >= STAR_FAN_GATES[4]) topStarUnlockedAt = level;
+        for (const t of [3, 5]) if (gateOpenAt[t] === null && fans >= STADIUM_FAN_GATES[t]) gateOpenAt[t] = level;
         if (roster[0] && isTired(roster[0]) && coins >= REST_PRICE) {
             coins -= REST_PRICE;
             roster[0] = { ...roster[0], fitness: 100 };
@@ -75,6 +79,7 @@ function simulate(levels: number) {
                 if (price !== null) offers.push({ price, buy: () => upgrades[id]++ });
             }
             kits.forEach((price, i) => offers.push({ price, buy: () => kits.splice(i, 1) }));
+            if (tier < MAX_STADIUM_TIER && fans >= stadiumGate(tier + 1)) offers.push({ price: stadiumPrice(tier + 1), buy: () => tier++ });
             for (const c of candidates) {
                 if (canSign(c, Infinity, fans, roster) !== 'ok') continue;
                 offers.push({
@@ -92,13 +97,13 @@ function simulate(levels: number) {
             cheapest.buy();
             purchases.push(level);
         }
-        rows.push(`L${level} goals ${goals} fans +${earnedFans}=${fans} coins ${coins} stars ${roster.length} bought ${purchases.filter((l) => l === level).length}`);
+        rows.push(`L${level} goals ${goals} fans +${earnedFans}=${fans} coins ${coins} stars ${roster.length} tier ${tier} bought ${purchases.filter((l) => l === level).length}`);
     }
-    return { purchases, rows, firstStarAt, topStarUnlockedAt };
+    return { purchases, rows, firstStarAt, topStarUnlockedAt, gateOpenAt, finalTier: tier };
 }
 
 describe('club economy (casual player model)', () => {
-    const { purchases, rows, firstStarAt, topStarUnlockedAt } = simulate(40);
+    const { purchases, rows, firstStarAt, topStarUnlockedAt, gateOpenAt, finalTier } = simulate(40);
     console.log(rows.join('\n'));
 
     it('makes the first purchase within 3 levels', () => {
@@ -121,6 +126,14 @@ describe('club economy (casual player model)', () => {
     it('signs a first star early', () => {
         expect(firstStarAt).not.toBeNull();
         expect(firstStarAt!).toBeLessThanOrEqual(6);
+    });
+
+    it('opens stadium tier 3 mid game, and keeps tier 5 a long-term goal', () => {
+        expect(gateOpenAt[3]).not.toBeNull();
+        expect(gateOpenAt[3]!).toBeGreaterThanOrEqual(10);
+        expect(gateOpenAt[3]!).toBeLessThanOrEqual(20);
+        expect(gateOpenAt[5] === null || gateOpenAt[5] >= 30).toBe(true);
+        expect(finalTier).toBeGreaterThanOrEqual(2);
     });
 
     it('unlocks the popularity-4 fan gate in the mid game', () => {

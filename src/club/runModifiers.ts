@@ -1,5 +1,6 @@
 import {
     FAN_CLUB_BONUS,
+    FAN_DRIVE_BONUS,
     MAGNET_BONUS,
     MAGNET_REACH,
     POPULARITY_FAN_BONUS,
@@ -9,6 +10,7 @@ import {
     STAR_SOCKS,
     type UpgradeId
 } from './balance';
+import { isActive, type Campaign } from './office';
 import { isAvailable, isTired, type StarPlayer } from './stars';
 
 export interface RunModifiers {
@@ -26,6 +28,7 @@ interface ClubState {
     upgrades: Readonly<Record<UpgradeId, number>>;
     roster?: readonly StarPlayer[];
     activeStar?: string | null;
+    campaign?: Campaign | null;
 }
 
 /** The active star if they can play this run (signed and not injured). */
@@ -49,6 +52,7 @@ export function runModifiers(save: ClubState): RunModifiers {
         fanMult: 1 + FAN_CLUB_BONUS * u.fanclub,
         shield: null
     };
+    if (isActive(save.campaign ?? null, 'fanDrive')) mods.fanMult += FAN_DRIVE_BONUS;
     const star = activeStar(save);
     if (!star) return mods;
 

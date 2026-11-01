@@ -1,5 +1,5 @@
 // The club's star-player booths (SQUAD, SCOUT, DOCTOR), built into the
-// ClubScene content area. Kept apart from ClubScene so neither file sprawls.
+// ClubScene content area.
 import * as Phaser from 'phaser';
 import { TEX } from '../art/textures';
 import { Sfx } from '../audio/Sfx';
@@ -9,27 +9,10 @@ import { COLORS, GAME_WIDTH } from '../config';
 import { REWARD_IDS } from '../game/adPolicy';
 import { Progress } from '../state/Progress';
 import { createRewardedButton } from '../ui/rewardedButton';
-import { createButton, drawCandy, textStyle } from '../ui/widgets';
+import { createButton, textStyle } from '../ui/widgets';
+import { cardBackground, CONTENT_Y, fanLock, floatText, GREY, INK, pillButton, ROW_W, shake, SUB, type ClubHost } from './clubUi';
 
-export type Booth = 'squad' | 'scout' | 'doctor' | 'training' | 'merch';
-
-/** Top of the area below the booth tabs. */
-export const CONTENT_Y = 450;
-
-/** What the panels need from the hub. */
-export interface ClubHost {
-    scene: Phaser.Scene;
-    refresh(): void;
-    showBooth(booth: Booth): void;
-    isLeaving(): boolean;
-    coinsChanged(): void;
-}
-
-const INK = '#1b2a5c';
-const SUB = '#5a6a94';
-const ROW_W = 640;
 const SKIN = 0xe0ac69;
-const GREY = 0xb0b8c8;
 
 /** Release asks for a second tap; this remembers which star is waiting for it. */
 let confirmRelease: { id: string; until: number } | null = null;
@@ -114,17 +97,7 @@ export function buildScout(host: ClubHost, root: Phaser.GameObjects.Container): 
         const check = canSign(star, coins, fans, roster);
         if (check === 'fans') {
             // Hard fan gate: show what it takes, with progress.
-            const gate = fanGate(star.popularity);
-            const g = scene.add.graphics();
-            drawCandy(g, 220 - 85, -56, 170, 48, GREY, 24);
-            g.fillStyle(0xdde3ee).fillRoundedRect(220 - 75, 34, 150, 14, 7);
-            g.fillStyle(0xff4f8b).fillRoundedRect(220 - 75, 34, Math.max(14, 150 * Math.min(1, fans / gate)), 14, 7);
-            row.add([
-                g,
-                scene.add.image(220 - 52, -34, TEX.fan).setScale(0.9),
-                scene.add.text(220 + 16, -34, String(gate), textStyle(26)).setOrigin(0.5),
-                scene.add.text(220, 16, `FANS NEEDED (${fans})`, textStyle(16, SUB, false)).setOrigin(0.5)
-            ]);
+            row.add(fanLock(scene, 220, fans, fanGate(star.popularity)));
         } else if (check === 'full') {
             row.add(pillButton(scene, 220, -10, 170, 52, GREY, 'SQUAD FULL', null));
         } else {
@@ -137,7 +110,7 @@ export function buildScout(host: ClubHost, root: Phaser.GameObjects.Container): 
                     floatText(scene, 'SIGNED!', cx, y, '#ffd21f');
                 } else {
                     Sfx.play('gateBad');
-                    scene.tweens.add({ targets: row, x: row.x + 10, duration: 50, yoyo: true, repeat: 3 });
+                    shake(scene, row);
                 }
             }, true);
             row.add(pill);
@@ -188,7 +161,7 @@ function treat(host: ClubHost, row: Phaser.GameObjects.Container, ok: boolean): 
         host.refresh();
     } else {
         Sfx.play('gateBad');
-        host.scene.tweens.add({ targets: row, x: row.x + 10, duration: 50, yoyo: true, repeat: 3 });
+        shake(host.scene, row);
     }
 }
 
@@ -196,9 +169,7 @@ function treat(host: ClubHost, row: Phaser.GameObjects.Container, ok: boolean): 
 
 /** White card with avatar, name, popularity, skill and fitness. Buttons go on the right (x ≈ 220). */
 function starRow(scene: Phaser.Scene, star: StarPlayer, x: number, y: number, h: number, big = false): Phaser.GameObjects.Container {
-    const bg = scene.add.graphics();
-    bg.fillStyle(COLORS.ink, 0.3).fillRoundedRect(-ROW_W / 2, -h / 2 + 7, ROW_W, h, 24);
-    bg.fillStyle(0xffffff).fillRoundedRect(-ROW_W / 2, -h / 2, ROW_W, h, 24);
+    const bg = cardBackground(scene, h);
 
     const r = big ? 44 : 36;
     const ax = -ROW_W / 2 + 22 + r;
@@ -234,40 +205,4 @@ function starRow(scene: Phaser.Scene, star: StarPlayer, x: number, y: number, h:
         items.push(bar, scene.add.text(tx + w + 10, 33, `FIT ${star.fitness}`, textStyle(16, SUB, false)).setOrigin(0, 0.5));
     }
     return scene.add.container(x, y, items).setSize(ROW_W, h);
-}
-
-/** Small candy pill; with `coin`, the label is a price. A null action makes it a plain label. */
-function pillButton(
-    scene: Phaser.Scene,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    color: number,
-    label: string,
-    action: (() => void) | null,
-    coin = false
-): Phaser.GameObjects.Container {
-    const g = scene.add.graphics();
-    drawCandy(g, -w / 2, -h / 2, w, h, color, h / 2);
-    const text = scene.add.text(coin ? 14 : 0, -3, label, textStyle(label.length > 8 ? 20 : 26)).setOrigin(0.5);
-    const items: Phaser.GameObjects.GameObject[] = [g, text];
-    if (coin) items.push(scene.add.image(text.x - text.width / 2 - 18, -3, TEX.coin).setScale(0.9));
-    const pill = scene.add.container(x, y, items).setSize(w, h);
-    if (action) {
-        pill.setInteractive({ useHandCursor: true });
-        pill.on('pointerdown', () => pill.setScale(0.93));
-        pill.on('pointerout', () => pill.setScale(1));
-        pill.on('pointerup', () => {
-            pill.setScale(1);
-            action();
-        });
-    }
-    return pill;
-}
-
-function floatText(scene: Phaser.Scene, text: string, x: number, y: number, color: string): void {
-    const t = scene.add.text(x, y, text, textStyle(56, color)).setOrigin(0.5).setDepth(20).setScale(0);
-    scene.tweens.add({ targets: t, scale: 1, duration: 250, ease: 'Back.easeOut' });
-    scene.tweens.add({ targets: t, y: y - 80, alpha: 0, delay: 700, duration: 400, onComplete: () => t.destroy() });
 }

@@ -109,7 +109,8 @@ export class GameScene extends Phaser.Scene {
 
         this.world = new World3D(this, this.spec, kit.shirt, GOAL_DISTANCE, {
             crowdFill: crowdFill(Progress.data.fans),
-            leaderLook: this.star ? starLook(this.star) : undefined
+            leaderLook: this.star ? starLook(this.star) : undefined,
+            stadiumTier: Progress.data.stadiumTier
         });
         Stage.show();
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {

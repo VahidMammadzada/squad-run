@@ -108,3 +108,34 @@ export const LAST_NAMES = [
 export const HAIR_COLORS = [0x3e2723, 0x1a1a1a, 0xf2c94c, 0xd35400, 0x8e5a2b, 0xeeeeee, 0x2f6fed, 0xe91e63];
 /** Stars wear gold socks so they stand out from their mates. */
 export const STAR_SOCKS = 0xffd21f;
+
+// --- Stadium and marketing (M3) ---
+
+export const MAX_STADIUM_TIER = 5;
+/** Price to reach each tier (index = tier; tier 1 is where everyone starts). */
+export const STADIUM_PRICES = [0, 0, 300, 800, 1600, 3000] as const;
+/** Fans needed before buying each tier (hard gate on tiers 3-5). */
+export const STADIUM_FAN_GATES = [0, 0, 0, 500, 1200, 2500] as const;
+/** Merch income bonus per tier above 1. */
+export const STADIUM_MERCH_BONUS = 0.25;
+
+export type CampaignId = 'fanDrive' | 'merchPromo' | 'talentBuzz';
+
+export interface CampaignDef {
+    id: CampaignId;
+    name: string;
+    effect: string;
+    price: number;
+}
+
+export const CAMPAIGNS: readonly CampaignDef[] = [
+    { id: 'fanDrive', name: 'Fan Drive', effect: '+50% fans', price: 150 },
+    { id: 'merchPromo', name: 'Merch Promo', effect: 'x2 merch income', price: 120 },
+    { id: 'talentBuzz', name: 'Talent Buzz', effect: 'Scout finds +1 star players', price: 200 }
+];
+export const CAMPAIGN_IDS: readonly CampaignId[] = CAMPAIGNS.map((c) => c.id);
+/** Completed levels a campaign lasts, and how many the rewarded extension adds (once). */
+export const CAMPAIGN_LEVELS = 3;
+export const CAMPAIGN_EXTEND = 2;
+export const FAN_DRIVE_BONUS = 0.5;
+export const MERCH_PROMO_MULT = 2;

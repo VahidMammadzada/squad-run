@@ -16,7 +16,8 @@ export const REWARD_IDS = {
     tripleCoins: 'triple-coins',
     merchDouble: 'merch-double',
     scoutRefresh: 'scout-refresh',
-    doctorHeal: 'doctor-heal'
+    doctorHeal: 'doctor-heal',
+    campaignExtend: 'campaign-extend'
 } as const;
 
 /**

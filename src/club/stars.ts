@@ -59,8 +59,11 @@ export function maxScoutPopularity(level: number): number {
     return Math.min(MAX_POPULARITY, 2 + Math.floor(level / 5));
 }
 
-/** The scout's list: deterministic for a seed, so reloading shows the same players. */
-export function generateCandidates(seed: number, level: number): StarPlayer[] {
+/**
+ * The scout's list: deterministic for a seed, so reloading shows the same
+ * players. `popBonus` (Talent Buzz) raises every player's popularity.
+ */
+export function generateCandidates(seed: number, level: number, popBonus = 0): StarPlayer[] {
     const rng = new Rng(seed * 7919 + 13);
     const top = maxScoutPopularity(level);
     return Array.from({ length: TRANSFER_SIZE }, (_, i) => {
@@ -70,7 +73,7 @@ export function generateCandidates(seed: number, level: number): StarPlayer[] {
         return {
             id: `s${seed}-${i}`,
             name,
-            popularity,
+            popularity: Math.min(MAX_POPULARITY, popularity + popBonus),
             skill: SKILL_IDS[rng.int(0, SKILL_IDS.length - 1)],
             fitness: FITNESS_MAX,
             injuredLevels: 0,

@@ -27,7 +27,7 @@ export class TitleScene extends Phaser.Scene {
         const kit = getKit(selectedKit);
 
         // The next level's stadium, with the squad jogging on the spot in the equipped kit.
-        this.world = new World3D(this, generateLevel(level), kit.shirt, GOAL_DISTANCE, { crowdFill: crowdFill(fans) });
+        this.world = new World3D(this, generateLevel(level), kit.shirt, GOAL_DISTANCE, { crowdFill: crowdFill(fans), stadiumTier: Progress.data.stadiumTier });
         Stage.show();
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.world.dispose();
