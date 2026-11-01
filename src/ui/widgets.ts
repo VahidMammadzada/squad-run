@@ -91,13 +91,24 @@ export function createButton(
  * stray release can't buy or close anything.
  */
 export function onTap(target: Phaser.GameObjects.GameObject, handler: () => void): void {
-    let armed = false;
-    target.on('pointerdown', () => (armed = true));
-    target.on('pointerout', () => (armed = false));
-    target.on('pointerup', () => {
-        if (!armed) return;
-        armed = false;
+    // The pointer that pressed this object, or null. Touch doesn't always send
+    // pointerout, so any release anywhere also disarms: the scene's pointerup
+    // fires after the object's own, so a release on the object still counts.
+    let armedBy: number | null = null;
+    const disarm = () => (armedBy = null);
+    target.on('pointerdown', (p: Phaser.Input.Pointer) => (armedBy = p.id));
+    target.on('pointerout', disarm);
+    target.on('pointerup', (p: Phaser.Input.Pointer) => {
+        if (armedBy !== p.id) return;
+        armedBy = null;
         handler();
+    });
+    const input = target.scene.input;
+    input.on('pointerup', disarm);
+    input.on('pointerupoutside', disarm);
+    target.once('destroy', () => {
+        input.off('pointerup', disarm);
+        input.off('pointerupoutside', disarm);
     });
 }
 

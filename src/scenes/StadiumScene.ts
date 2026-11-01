@@ -50,7 +50,7 @@ export class StadiumScene extends Phaser.Scene {
     private targetStall: StallId | null = null;
     private stick: { origin: Phaser.Math.Vector2; vec: Vec2 } | null = null;
     private stickGfx!: Phaser.GameObjects.Graphics;
-    private press: { x: number; y: number; at: number } | null = null;
+    private press: { x: number; y: number; at: number; pointerId: number } | null = null;
     /** Which stall's menu already opened this visit, and how long the manager has stood still (pure rules in concourse.ts). */
     private trigger: StallTrigger = NO_TRIGGER;
     private panelOpen = false;
@@ -115,11 +115,12 @@ export class StadiumScene extends Phaser.Scene {
         if (this.won) this.time.delayedCall(450, () => this.celebrate(Progress.data.manager.celebration));
 
         this.input.on('pointerdown', (p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
-            if (over.length > 0 || this.panelOpen || this.leaving) return;
-            this.press = { x: p.x, y: p.y, at: this.time.now };
+            // A second finger doesn't take over the joystick.
+            if (over.length > 0 || this.panelOpen || this.leaving || this.press) return;
+            this.press = { x: p.x, y: p.y, at: this.time.now, pointerId: p.id };
         });
         this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-            if (!this.press || !p.isDown || this.panelOpen) return;
+            if (!this.press || p.id !== this.press.pointerId || !p.isDown || this.panelOpen) return;
             const dx = p.x - this.press.x;
             const dy = p.y - this.press.y;
             if (!this.stick && Math.hypot(dx, dy) > DRAG_START) {
@@ -134,6 +135,7 @@ export class StadiumScene extends Phaser.Scene {
             }
         });
         this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+            if (this.press && p.id !== this.press.pointerId) return;
             const press = this.press;
             this.press = null;
             if (this.stick) {
@@ -287,8 +289,12 @@ export class StadiumScene extends Phaser.Scene {
         const dt = Math.min(deltaMs, 50) / 1000;
         const before = this.pos;
 
-        // Safety net: a joystick can't outlive the finger holding it.
-        if ((this.stick || this.press) && !this.input.activePointer.isDown) this.releaseTouch();
+        // Safety net: a joystick can't outlive the finger holding it (that finger, not whichever pointer moved last).
+        if (this.stick || this.press) {
+            const id = this.press?.pointerId;
+            const finger = this.input.manager.pointers.find((p) => p.id === id);
+            if (!finger?.isDown) this.releaseTouch();
+        }
 
         if (!this.panelOpen && !this.leaving) {
             const keyDir = this.keys
@@ -312,6 +318,8 @@ export class StadiumScene extends Phaser.Scene {
                 walking: this.target !== null
             });
             this.trigger = step.trigger;
+            // The auto-walk is over (it arrived this frame or was cancelled), so its stall no longer gets the instant open.
+            if (!this.target) this.targetStall = null;
             if (step.open) this.openPanel(step.open);
             if (this.openOnArrival) {
                 const stall = this.openOnArrival;

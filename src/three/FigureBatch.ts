@@ -81,6 +81,8 @@ export class FigureBatch {
     /** Per-figure mode: the colour each tinted mesh takes from a figure's colours. */
     private readonly tints = new Map<THREE.InstancedMesh, Tint>();
     private readonly tint = new THREE.Color();
+    /** Per-figure mode: the colours last written, so unchanged colours aren't re-uploaded every frame. */
+    private lastColors: readonly FigureColors[] = [];
 
     // Scratch objects reused every frame.
     private readonly base = new THREE.Matrix4();
@@ -139,6 +141,9 @@ export class FigureBatch {
     /** `colors[i]` dresses `poses[i]`; required for a `'perFigure'` batch, ignored otherwise. */
     draw(poses: readonly Pose[], colors?: readonly FigureColors[]): void {
         const n = poses.length;
+        if (this.tints.size > 0 && (!colors || colors.length < n)) {
+            throw new Error(`FigureBatch: a 'perFigure' batch needs colours for all ${n} figures, got ${colors?.length ?? 0}`);
+        }
         for (let i = 0; i < n; i++) {
             const p = poses[i];
             const swing = Math.sin(p.phase) * 0.85 * p.run;
@@ -173,13 +178,21 @@ export class FigureBatch {
             m.count = n * 2;
             m.instanceMatrix.needsUpdate = true;
         }
-        if (colors && this.tints.size > 0) {
+        if (colors && this.tints.size > 0 && !this.sameColors(colors, n)) {
             for (const [m, tint] of this.tints) {
                 const perFigure = m.count / Math.max(1, n);
                 for (let i = 0; i < m.count; i++) m.setColorAt(i, this.tint.setHex(tint(colors[Math.floor(i / perFigure)])));
                 if (m.instanceColor) m.instanceColor.needsUpdate = true;
             }
+            this.lastColors = colors.slice(0, n);
         }
+    }
+
+    /** True if the first `n` colours are the same objects as last time (callers reuse their colour objects). */
+    private sameColors(colors: readonly FigureColors[], n: number): boolean {
+        if (this.lastColors.length !== n) return false;
+        for (let i = 0; i < n; i++) if (this.lastColors[i] !== colors[i]) return false;
+        return true;
     }
 
     /** Places one part: offset from the figure's feet, then rotated about its joint. */

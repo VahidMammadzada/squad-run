@@ -175,8 +175,16 @@ export class ConcourseWorld {
         const signLabel = STALLS.find((s) => s.id === id)!.label;
         // Faces down the concourse towards the camera, turned a little to the walkway.
         const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.55), new THREE.MeshBasicMaterial({ map: stallSignTexture(signLabel, color), transparent: true }));
-        sign.position.set(-side * 0.45, 3.1, 1.5);
-        sign.rotation.y = -side * 0.55;
+        if (z > -2) {
+            // A stall by the entrance is beside the camera, so its sign hangs from the far post, out over
+            // the walkway edge and lower, where it's on screen and clear of the next stall's sign.
+            sign.position.set(-side * 1.45, 2.3, -2);
+            sign.rotation.y = -side * 0.2;
+            sign.scale.setScalar(0.8);
+        } else {
+            sign.position.set(-side * 0.7, 3.1, 1.5);
+            sign.rotation.y = -side * 0.55;
+        }
         group.add(sign);
         this.scene.add(group);
         this.pickables.push(group);
