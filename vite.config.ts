@@ -14,10 +14,13 @@ export default defineConfig({
             compress: { passes: 2 },
             format: { comments: false }
         },
+        // Phaser alone minifies to ~1.2 MB; the split chunks below are expected to be large.
+        chunkSizeWarningLimit: 1300,
         rollupOptions: {
             output: {
                 manualChunks: {
-                    phaser: ['phaser']
+                    phaser: ['phaser'],
+                    three: ['three']
                 }
             }
         }

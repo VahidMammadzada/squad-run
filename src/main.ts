@@ -11,7 +11,14 @@ import { Playables } from './sdk/Playables';
 import { Progress } from './state/Progress';
 import { Stage } from './three/Stage';
 
-Playables.boot(() => {
+// Dev only: `?mock` installs a fake SDK with a debug panel. The DEV check is
+// constant-folded away in production builds, taking the import with it.
+const sdkReady: Promise<void> =
+    import.meta.env.DEV && new URLSearchParams(location.search).has('mock')
+        ? import('./sdk/mockYtgame').then((m) => m.installMockYtgame())
+        : Promise.resolve();
+
+void sdkReady.then(() => Playables.boot(() => {
     const game = new Phaser.Game({
         type: Phaser.AUTO,
         parent: 'game',
@@ -40,4 +47,4 @@ Playables.boot(() => {
         game.resume();
         Sfx.resume();
     });
-});
+}));

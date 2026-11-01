@@ -2,10 +2,8 @@ import * as Phaser from 'phaser';
 import { Sfx } from '../audio/Sfx';
 import { PITCH_CENTER } from '../config';
 import { GOAL_HALF_WIDTH, type World3D } from '../three/World3D';
-import { goalsFor, playersPerGoal } from './scoring';
-
-/** Long shootouts are batched so the sequence never drags on. */
-const MAX_SHOTS = 20;
+import { playersPerGoal } from './scoring';
+import { planShootout } from './shootoutPlan';
 
 interface ShootoutCallbacks {
     /** The squad shrinks as players are spent on shots. */
@@ -14,17 +12,11 @@ interface ShootoutCallbacks {
     onDone: (goals: number) => void;
 }
 
-/**
- * The end-of-level charge on goal. Every `playersPerGoal` squad members score
- * one goal; a squad too small to score gets one shot that the keeper saves.
- */
+/** The end-of-level charge on goal, played out from `planShootout`. */
 export function runShootout(scene: Phaser.Scene, world: World3D, squadCount: number, level: number, cb: ShootoutCallbacks): void {
     const perGoal = playersPerGoal(level);
-    const goals = goalsFor(squadCount, level);
-    const shots = goals === 0 ? 1 : Math.min(goals, MAX_SHOTS);
-    // Goals each shot is worth when batched.
-    const worth = Array.from({ length: shots }, (_, i) => Math.floor(goals / shots) + (i < goals % shots ? 1 : 0));
-    const interval = shots > 10 ? 220 : 380;
+    const { goals, worth, interval } = planShootout(squadCount, level);
+    const shots = worth.length;
     let scored = 0;
     let count = squadCount;
 
