@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { CONCOURSE, headingOf, inTunnel, servePoint, stallAt, STALLS, stepToward, stepWalk } from './concourse';
+import {
+    clampToWalkway,
+    CONCOURSE,
+    headingOf,
+    inTunnel,
+    NO_TRIGGER,
+    servePoint,
+    STALL_DWELL,
+    stallAt,
+    STALLS,
+    stepStallTrigger,
+    stepToward,
+    stepWalk,
+    type StallId,
+    type StallTrigger
+} from './concourse';
 
 describe('concourse walking', () => {
     it('walks at full speed in the input direction, capped at length 1', () => {
@@ -51,8 +66,59 @@ describe('concourse triggers', () => {
         expect(inTunnel({ x: 0, z: -15 })).toBe(false);
     });
 
+    it('clamps a floor tap outside the walkway to the nearest walkable spot', () => {
+        expect(clampToWalkway({ x: 3, z: -11 })).toEqual({ x: CONCOURSE.halfWidth, z: -11 });
+        // An auto-walk to the clamped spot arrives, so it doesn't keep walking forever.
+        let pos = { ...CONCOURSE.spawn };
+        let arrived = false;
+        for (let i = 0; i < 200 && !arrived; i++) ({ pos, arrived } = stepToward(pos, clampToWalkway({ x: 3, z: -11 }), 0.05));
+        expect(arrived).toBe(true);
+    });
+
     it('faces the direction of travel', () => {
         expect(headingOf(0, -1, 9)).toBeCloseTo(0);
         expect(headingOf(0, 0, 9)).toBe(9);
+    });
+});
+
+describe('stall trigger', () => {
+    const DT = 1 / 60;
+    type Frame = { here: StallId | null; moved?: number; destination?: StallId | null; walking?: boolean };
+    /** Runs frames through the trigger and returns the stalls opened. */
+    function run(frames: Frame[], start: StallTrigger = NO_TRIGGER): { opened: StallId[]; trigger: StallTrigger } {
+        let trigger = start;
+        const opened: StallId[] = [];
+        for (const f of frames) {
+            const r = stepStallTrigger(trigger, { here: f.here, moved: f.moved ?? 0, dt: DT, destination: f.destination ?? null, walking: f.walking ?? false });
+            trigger = r.trigger;
+            if (r.open) opened.push(r.open);
+        }
+        return { opened, trigger };
+    }
+    const frames = (n: number, f: Frame): Frame[] => Array.from({ length: n }, () => f);
+
+    it('opens a stall after standing still at it for STALL_DWELL, not before', () => {
+        const justUnder = Math.floor(STALL_DWELL / DT) - 1;
+        expect(run(frames(justUnder, { here: 'scout' })).opened).toEqual([]);
+        expect(run(frames(justUnder + 3, { here: 'scout' })).opened).toEqual(['scout']);
+    });
+
+    it('never opens a stall the manager is walking past, however slowly', () => {
+        expect(run(frames(120, { here: 'scout', moved: 0.01 })).opened).toEqual([]);
+    });
+
+    it('opens once per visit, and again after walking away and back', () => {
+        const stay = run(frames(60, { here: 'merch' }));
+        expect(stay.opened).toEqual(['merch']);
+        const back = run([...frames(2, { here: null }), ...frames(30, { here: 'merch' })], stay.trigger);
+        expect(back.opened).toEqual(['merch']);
+    });
+
+    it('opens an auto-walk destination at once on arrival', () => {
+        expect(run([{ here: 'doctor', moved: 0.08, destination: 'doctor' }]).opened).toEqual(['doctor']);
+    });
+
+    it('keeps stalls passed on the way shut during an auto-walk', () => {
+        expect(run(frames(60, { here: 'scout', moved: 0, destination: 'doctor', walking: true })).opened).toEqual([]);
     });
 });

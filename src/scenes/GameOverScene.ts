@@ -75,17 +75,18 @@ export class GameOverScene extends Phaser.Scene {
             fontSize: reviveButton ? 44 : 52,
             pulse: !reviveButton
         });
+        // Back to the club to spend coins or heal a star; the title is one tap away from there.
         createButton(
             this,
             cx,
             retryY + 118,
-            'MENU',
+            'STADIUM',
             () =>
                 this.moveOn(() => {
                     this.scene.stop('Game');
-                    this.scene.start('Title');
+                    this.scene.start('Stadium', {});
                 }),
-            { width: 260, height: 80, fontSize: 32, color: COLORS.buttonAlt }
+            { width: 300, height: 80, fontSize: 32, color: COLORS.buttonAlt }
         );
     }
 

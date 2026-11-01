@@ -2,7 +2,7 @@ import * as Phaser from 'phaser';
 import { Sfx } from '../audio/Sfx';
 import { stallDef, type StallId } from '../club/concourse';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../config';
-import { textStyle } from '../ui/widgets';
+import { onTap, textStyle } from '../ui/widgets';
 import { buildMerch } from './clubMerch';
 import { buildOffice } from './clubOffice';
 import { buildDoctor, buildScout, buildSquad } from './clubStars';
@@ -50,7 +50,7 @@ export class StallPanelScene extends Phaser.Scene {
         // Tapping the dimmed concourse above the sheet closes it.
         const top = this.top;
         const dim = this.add.rectangle(0, 0, GAME_WIDTH, top, COLORS.ink, this.stall === 'wardrobe' ? 0 : 0.35).setOrigin(0).setInteractive();
-        dim.on('pointerup', () => this.close());
+        onTap(dim, () => this.close());
 
         const bg = this.add.graphics();
         bg.fillStyle(0x000000, 0.25).fillRoundedRect(0, top - 10, GAME_WIDTH, GAME_HEIGHT, 36);
@@ -67,7 +67,7 @@ export class StallPanelScene extends Phaser.Scene {
         cg.lineStyle(5, 0xffffff).strokeCircle(0, 0, 30);
         close.add([cg, this.add.text(0, -2, 'X', textStyle(34)).setOrigin(0.5)]);
         close.setSize(64, 64).setInteractive({ useHandCursor: true });
-        close.on('pointerup', () => this.close());
+        onTap(close, () => this.close());
 
         this.sheet = this.add.container(0, GAME_HEIGHT - top, [bg, blocker, title, close]);
         this.tweens.add({ targets: this.sheet, y: 0, duration: 240, ease: 'Back.easeOut' });

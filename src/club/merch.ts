@@ -10,7 +10,11 @@ export function merchCap(fans: number, mult = 1): number {
     return merchPerLevel(fans, mult) * MERCH_CAP_LEVELS;
 }
 
-/** Pending merch after one more completed level. */
+/**
+ * Pending merch after one more completed level. Stops growing at the cap, but
+ * never shrinks: when a promo ends and the cap drops, takings already earned stay.
+ */
 export function accrueMerch(pending: number, fans: number, mult = 1): number {
-    return Math.min(merchCap(fans, mult), Math.max(0, pending) + merchPerLevel(fans, mult));
+    const held = Math.max(0, pending);
+    return Math.max(held, Math.min(merchCap(fans, mult), held + merchPerLevel(fans, mult)));
 }

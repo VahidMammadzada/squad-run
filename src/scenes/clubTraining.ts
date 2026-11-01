@@ -6,7 +6,7 @@ import { UPGRADES, type UpgradeDef } from '../club/balance';
 import { isMaxed, maxLevel, nextPrice } from '../club/upgrades';
 import { COLORS, GAME_WIDTH } from '../config';
 import { Progress } from '../state/Progress';
-import { drawCandy, textStyle } from '../ui/widgets';
+import { drawCandy, onTap, textStyle } from '../ui/widgets';
 import { cardBackground, CONTENT_Y, GREY, INK, ROW_W, shake, SUB, type ClubHost } from './clubUi';
 
 const ROW_H = 118;
@@ -51,8 +51,8 @@ function upgradeRow(host: ClubHost, def: UpgradeDef, x: number, y: number): Phas
         row.setInteractive({ useHandCursor: true });
         row.on('pointerdown', () => row.setScale(0.97));
         row.on('pointerout', () => row.setScale(1));
-        row.on('pointerup', () => {
-            row.setScale(1);
+        row.on('pointerup', () => row.setScale(1));
+        onTap(row, () => {
             if (Progress.buyUpgrade(def.id)) {
                 Sfx.play('coin');
                 host.coinsChanged();

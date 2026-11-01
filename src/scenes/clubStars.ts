@@ -9,7 +9,7 @@ import { COLORS, GAME_WIDTH } from '../config';
 import { REWARD_IDS } from '../game/adPolicy';
 import { Progress } from '../state/Progress';
 import { createRewardedButton } from '../ui/rewardedButton';
-import { createButton, textStyle } from '../ui/widgets';
+import { createButton, onTap, textStyle } from '../ui/widgets';
 import { cardBackground, CONTENT_Y, fanLock, floatText, GREY, INK, pillButton, ROW_W, shake, SUB, type ClubHost } from './clubUi';
 
 const SKIN = 0xe0ac69;
@@ -52,7 +52,7 @@ export function buildSquad(host: ClubHost, root: Phaser.GameObjects.Container): 
             .text(220, 32, confirming ? `TAP AGAIN: +${refund}` : 'RELEASE', textStyle(18, confirming ? '#e53935' : '#8a96b8', false))
             .setOrigin(0.5)
             .setInteractive({ useHandCursor: true });
-        release.on('pointerup', () => {
+        onTap(release, () => {
             if (confirming) {
                 confirmRelease = null;
                 Progress.releaseStar(star.id);

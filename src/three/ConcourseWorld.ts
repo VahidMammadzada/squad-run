@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CONCOURSE, STALLS, type StallId, type Vec2 } from '../club/concourse';
 import type { StarPlayer } from '../club/stars';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../config';
-import { FigureBatch, makePose, type Pose } from './FigureBatch';
+import { FigureBatch, makePose, type FigureColors, type Pose } from './FigureBatch';
 import type * as Phaser from 'phaser';
 import type { CelebrationId } from '../club/wardrobe';
 import { defaultLook, ManagerView, type ManagerLook } from './ManagerView';
@@ -32,6 +32,14 @@ const VENDOR_SHIRTS: Record<StallId, number> = {
     wardrobe: 0xffffff
 };
 
+/** Where signed stars hang around, near the squad room. */
+const STAR_SPOTS = [
+    { x: -2.3, z: -2.2 },
+    { x: -2.4, z: -7.8 },
+    { x: -1.7, z: -8.5 },
+    { x: -2.4, z: -13.8 },
+    { x: -1.7, z: -14.5 }
+];
 const WALL_X = CONCOURSE.counterX + 1.5;
 const FLOOR_NEAR = 6;
 const FLOOR_FAR = -30;
@@ -58,9 +66,9 @@ export class ConcourseWorld {
     readonly manager: ManagerView;
     private readonly particles = new Particles(200);
 
-    private readonly vendors: FigureBatch[] = [];
-    private readonly vendorPoses: Pose[] = [];
-    private readonly starBatches: { batch: FigureBatch; pose: Pose }[] = [];
+    /** Vendors and signed stars: one batch with per-figure colours, so they cost a few draw calls in total. */
+    private readonly people = new FigureBatch(STALLS.length + STAR_SPOTS.length, 'perFigure');
+    private readonly folk: { pose: Pose; colors: FigureColors; star: boolean }[] = [];
     /** Meshes that tapping can hit, tagged with what they are. */
     private readonly pickables: THREE.Object3D[] = [];
     private readonly raycaster = new THREE.Raycaster();
@@ -91,6 +99,7 @@ export class ConcourseWorld {
         carpet.position.set(0, 0.01, (FLOOR_NEAR + CONCOURSE.tunnelZ - 2) / 2);
         this.scene.add(carpet);
 
+        this.scene.add(this.people.group);
         this.buildWalls(opts);
         for (const s of STALLS) this.buildStall(s.id, s.side, s.z, colors[s.id], s.id === 'merch' ? opts.kitColor : VENDOR_SHIRTS[s.id]);
         this.buildTunnel(opts.kitColor);
@@ -173,10 +182,11 @@ export class ConcourseWorld {
         this.pickables.push(group);
 
         // The vendor behind the counter, facing the walkway.
-        const vendor = new FigureBatch(1, { shirt: vendorShirt, shorts: 0x1b2a5c, hair: [0x3e2723, 0x1a1a1a, 0xd35400, 0xf2c94c][this.vendors.length % 4] });
-        this.scene.add(vendor.group);
-        this.vendors.push(vendor);
-        this.vendorPoses.push(makePose({ x: side * (CONCOURSE.counterX + 0.65), z, rotY: side * (Math.PI / 2), phase: Math.random() * 6 }));
+        this.folk.push({
+            pose: makePose({ x: side * (CONCOURSE.counterX + 0.65), z, rotY: side * (Math.PI / 2), phase: Math.random() * 6 }),
+            colors: { shirt: vendorShirt, shorts: 0x1b2a5c, hair: [0x3e2723, 0x1a1a1a, 0xd35400, 0xf2c94c][this.folk.length % 4] },
+            star: false
+        });
     }
 
     private buildTunnel(kitColor: number): void {
@@ -207,18 +217,12 @@ export class ConcourseWorld {
 
     /** Signed stars hang around near the squad room, in their own looks. */
     private buildStars(stars: ConcourseOptions['stars']): void {
-        const spots = [
-            { x: -2.3, z: -2.2 },
-            { x: -2.4, z: -7.8 },
-            { x: -1.7, z: -8.5 },
-            { x: -2.4, z: -13.8 },
-            { x: -1.7, z: -14.5 }
-        ];
-        stars.slice(0, spots.length).forEach(({ star, look }, i) => {
-            const batch = new FigureBatch(1, { shirt: 0xffffff, shorts: 0x1b2a5c, hair: look.hair, socks: look.socks });
-            this.scene.add(batch.group);
-            this.starBatches.push({ batch, pose: makePose({ ...spots[i], rotY: -Math.PI / 2 + (i % 2) * 0.6, phase: i, scale: 0.95 }) });
-            batch.group.userData.star = star.id;
+        stars.slice(0, STAR_SPOTS.length).forEach(({ look }, i) => {
+            this.folk.push({
+                pose: makePose({ ...STAR_SPOTS[i], rotY: -Math.PI / 2 + (i % 2) * 0.6, phase: i, scale: 0.95 }),
+                colors: { shirt: 0xffffff, shorts: 0x1b2a5c, hair: look.hair, socks: look.socks },
+                star: true
+            });
         });
     }
 
@@ -228,15 +232,18 @@ export class ConcourseWorld {
         this.particles.update(dt);
 
         // Vendors and stars sway gently while they wait.
-        this.vendorPoses.forEach((p, i) => {
-            p.y = Math.abs(Math.sin(this.time * 2 + i)) * 0.03;
-            p.armsOut = 0.15 + Math.sin(this.time * 1.5 + i) * 0.1;
-            this.vendors[i].draw([p]);
+        this.folk.forEach(({ pose: p, star }, i) => {
+            if (star) {
+                p.y = Math.abs(Math.sin(this.time * 2.5 + p.phase)) * 0.04;
+            } else {
+                p.y = Math.abs(Math.sin(this.time * 2 + i)) * 0.03;
+                p.armsOut = 0.15 + Math.sin(this.time * 1.5 + i) * 0.1;
+            }
         });
-        for (const { batch, pose } of this.starBatches) {
-            pose.y = Math.abs(Math.sin(this.time * 2.5 + pose.phase)) * 0.04;
-            batch.draw([pose]);
-        }
+        this.people.draw(
+            this.folk.map((f) => f.pose),
+            this.folk.map((f) => f.colors)
+        );
 
         if (this.previewMode) {
             // In front of the manager, low, aimed below them so they sit in the top half
@@ -291,8 +298,7 @@ export class ConcourseWorld {
 
     dispose(): void {
         this.manager.dispose();
-        for (const v of this.vendors) v.dispose();
-        for (const { batch } of this.starBatches) batch.dispose();
+        this.people.dispose();
         this.scene.traverse((obj) => {
             if (obj instanceof THREE.Mesh) {
                 obj.geometry.dispose();

@@ -76,12 +76,29 @@ export function createButton(
         button.setScale(1.04, 0.9);
     });
     button.on('pointerout', release);
-    button.on('pointerup', () => {
-        release();
+    button.on('pointerup', release);
+    onTap(button, () => {
         Sfx.play('click');
         onClick();
     });
     return button;
+}
+
+/**
+ * Calls `handler` when a press that started on `target` is released on it.
+ * A finger that was already down when the object appeared (a stall sheet
+ * sliding in under a joystick drag) or that slid onto it does nothing, so a
+ * stray release can't buy or close anything.
+ */
+export function onTap(target: Phaser.GameObjects.GameObject, handler: () => void): void {
+    let armed = false;
+    target.on('pointerdown', () => (armed = true));
+    target.on('pointerout', () => (armed = false));
+    target.on('pointerup', () => {
+        if (!armed) return;
+        armed = false;
+        handler();
+    });
 }
 
 /**

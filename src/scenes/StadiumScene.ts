@@ -1,7 +1,22 @@
 import * as Phaser from 'phaser';
 import { TEX } from '../art/textures';
 import { Sfx } from '../audio/Sfx';
-import { CONCOURSE, headingOf, inTunnel, servePoint, stallAt, STALLS, stepToward, stepWalk, type StallId, type Vec2 } from '../club/concourse';
+import {
+    clampToWalkway,
+    CONCOURSE,
+    headingOf,
+    inTunnel,
+    NO_TRIGGER,
+    servePoint,
+    stallAt,
+    STALLS,
+    stepStallTrigger,
+    stepToward,
+    stepWalk,
+    type StallId,
+    type StallTrigger,
+    type Vec2
+} from '../club/concourse';
 import { crowdFill } from '../club/fans';
 import { canUpgradeStadium } from '../club/office';
 import { starLook } from '../club/runModifiers';
@@ -18,8 +33,6 @@ import { startNextLevel } from './nextLevel';
 const DRAG_START = 14;
 /** Joystick radius (px): dragging this far is full speed. */
 const STICK_RADIUS = 80;
-/** Seconds to stand at a stall before its menu opens (so walking past doesn't trigger it). */
-const STALL_DWELL = 0.25;
 /** A touch shorter than this (ms) that didn't drag is a tap. */
 const TAP_MS = 350;
 
@@ -38,10 +51,8 @@ export class StadiumScene extends Phaser.Scene {
     private stick: { origin: Phaser.Math.Vector2; vec: Vec2 } | null = null;
     private stickGfx!: Phaser.GameObjects.Graphics;
     private press: { x: number; y: number; at: number } | null = null;
-    /** Stall the manager is standing at; its menu opens once per visit. */
-    private atStall: StallId | null = null;
-    /** Seconds spent inside a stall's radius without it having opened yet. */
-    private dwell = 0;
+    /** Which stall's menu already opened this visit, and how long the manager has stood still (pure rules in concourse.ts). */
+    private trigger: StallTrigger = NO_TRIGGER;
     private panelOpen = false;
     private leaving = false;
     private openOnArrival: StallId | null = null;
@@ -58,6 +69,7 @@ export class StadiumScene extends Phaser.Scene {
     /** Just won a level: celebrate on arrival. */
     private won = false;
 
+    /** Always start this scene with a data object (`{}` for none): Phaser reuses the previous visit's data when it is missing. */
     init(data: { booth?: StallId; won?: boolean }): void {
         this.won = data.won === true;
         this.pos = { ...CONCOURSE.spawn };
@@ -66,7 +78,7 @@ export class StadiumScene extends Phaser.Scene {
         this.targetStall = null;
         this.stick = null;
         this.press = null;
-        this.atStall = null;
+        this.trigger = NO_TRIGGER;
         this.panelOpen = false;
         this.leaving = false;
         this.bubbles.clear();
@@ -74,7 +86,7 @@ export class StadiumScene extends Phaser.Scene {
         this.openOnArrival = data.booth ?? null;
         if (data.booth) {
             this.pos = servePoint(data.booth);
-            this.atStall = data.booth;
+            this.trigger = { at: data.booth, still: 0 };
         }
     }
 
@@ -222,11 +234,12 @@ export class StadiumScene extends Phaser.Scene {
     walkTo(stall: StallId): void {
         this.setTarget(servePoint(stall), stall);
         // Re-open even if we're already standing there.
-        if (this.atStall === stall) this.atStall = null;
+        if (this.trigger.at === stall) this.trigger = NO_TRIGGER;
     }
 
     private setTarget(target: Vec2 | null, stall: StallId | null): void {
-        this.target = target;
+        // A tap can land on floor outside the walkway; aim for the nearest spot the manager can reach, or the walk would never end.
+        this.target = target && clampToWalkway(target);
         this.targetStall = stall;
     }
 
@@ -290,30 +303,20 @@ export class StadiumScene extends Phaser.Scene {
                 if (step.arrived) this.target = null;
             }
 
-            // Stall menus open when you arrive, once per visit. While auto-walking
-            // to a stall, the ones passed on the way stay shut.
-            let here = stallAt(this.pos);
-            if (this.target && this.targetStall && here !== this.targetStall) here = null;
-            if (here !== this.atStall) {
-                if (!here) {
-                    this.atStall = null;
-                    this.dwell = 0;
-                } else {
-                    // Walking past doesn't count: stand at the stall for a moment (auto-walk arrivals open at once).
-                    this.dwell += dt;
-                    if (this.dwell >= STALL_DWELL || this.targetStall === here) {
-                        this.atStall = here;
-                        this.dwell = 0;
-                        this.openPanel(here);
-                    }
-                }
-            } else {
-                this.dwell = 0;
-            }
+            // Stall menus open once per visit: on arriving by auto-walk, or after standing still for a moment.
+            const step = stepStallTrigger(this.trigger, {
+                here: stallAt(this.pos),
+                moved: Math.hypot(this.pos.x - before.x, this.pos.z - before.z),
+                dt,
+                destination: this.targetStall,
+                walking: this.target !== null
+            });
+            this.trigger = step.trigger;
+            if (step.open) this.openPanel(step.open);
             if (this.openOnArrival) {
                 const stall = this.openOnArrival;
                 this.openOnArrival = null;
-                this.atStall = stall;
+                this.trigger = { at: stall, still: 0 };
                 this.openPanel(stall);
             }
             if (inTunnel(this.pos)) this.play();

@@ -28,6 +28,8 @@ export const GOAL_HALF_WIDTH = 140;
 const GOAL_HEIGHT = 1.3;
 const GOAL_DEPTH = 0.9;
 const PITCH_HALF = units(PITCH_RIGHT - PITCH_LEFT) / 2;
+/** How far ahead (pitch pixels) the touchline manager starts being drawn; further away it is a speck. */
+const MANAGER_SHOW_AHEAD = 2500;
 const BASE_FOV = 55;
 /** Wider field of view on the final charge, for a sense of speed. */
 const BOOST_FOV = 64;
@@ -65,6 +67,8 @@ export class World3D {
     readonly squad: SquadView;
     private manager?: ManagerView;
     private managerAt = { x: 0, z: 0 };
+    /** Distance run (pitch pixels) from which the touchline manager is drawn. */
+    private managerFrom = 0;
     /** Distance of the goal line from the start, in pitch pixels. */
     readonly goalDist: number;
 
@@ -156,6 +160,9 @@ export class World3D {
             // inside the narrow portrait frame while the squad lines up to shoot.
             this.manager = new ManagerView(options.manager.look);
             this.managerAt = { x: -(PITCH_HALF - 0.45), z: -units(options.manager.dist) - 4.5 };
+            // Its ~20 meshes are separate draw calls, so it is only drawn once the squad is near enough to see it.
+            this.managerFrom = options.manager.dist - MANAGER_SHOW_AHEAD;
+            this.manager.group.visible = false;
             this.scene.add(this.manager.group);
         }
     }
@@ -381,7 +388,10 @@ export class World3D {
         this.time += dt;
         this.squad.update(dt, squadX, dist, count, running);
         this.particles.update(dt);
-        this.manager?.update(dt, this.managerAt.x, this.managerAt.z, -Math.PI / 2, 0);
+        if (this.manager) {
+            this.manager.group.visible = dist >= this.managerFrom;
+            this.manager.update(dt, this.managerAt.x, this.managerAt.z, -Math.PI / 2, 0);
+        }
 
         for (const d of this.defenders) {
             if (!d.down) d.pose.phase += dt * 2;

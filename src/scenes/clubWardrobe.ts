@@ -7,7 +7,7 @@ import { Sfx } from '../audio/Sfx';
 import { canBuyItem, isEquipped, isOwned, itemsFor, withItem, type ManagerEquip, type WardrobeItem, type WardrobeSlot } from '../club/wardrobe';
 import { COLORS, GAME_WIDTH } from '../config';
 import { Progress } from '../state/Progress';
-import { textStyle } from '../ui/widgets';
+import { onTap, textStyle } from '../ui/widgets';
 import { floatText, GREY, INK, shake, SUB, type ClubHost } from './clubUi';
 
 type Tab = 'body' | 'outfit' | 'hat' | 'accessory' | 'celebration';
@@ -45,7 +45,7 @@ export function buildWardrobe(host: ClubHost, root: Phaser.GameObjects.Container
         if (selected) g.lineStyle(4, 0xffffff).strokeRoundedRect(-tw / 2, -24, tw, 48, 24);
         const pill = scene.add.container(x, top + 100, [g, scene.add.text(0, -2, label, textStyle(label.length > 7 ? 18 : 22)).setOrigin(0.5)]);
         pill.setSize(tw, 48).setInteractive({ useHandCursor: true });
-        pill.on('pointerup', () => {
+        onTap(pill, () => {
             if (tab === id) return;
             Sfx.play('click');
             tab = id;
@@ -78,7 +78,7 @@ function swatches(host: ClubHost, root: Phaser.GameObjects.Container, slot: 'ski
         g.fillStyle(w.value as number).fillCircle(0, 0, 28);
         g.lineStyle(on ? 6 : 3, on ? COLORS.gold : 0xffffff).strokeCircle(0, 0, 28);
         const c = scene.add.container(x, y + 12, [g]).setSize(60, 60).setInteractive({ useHandCursor: true });
-        c.on('pointerup', () => wear(host, w, c));
+        onTap(c, () => wear(host, w, c));
         root.add(c);
     });
 }
@@ -122,10 +122,8 @@ function grid(host: ClubHost, root: Phaser.GameObjects.Container, items: Wardrob
         const card = scene.add.container(x, y, parts).setSize(w, h).setInteractive({ useHandCursor: true });
         card.on('pointerdown', () => card.setScale(0.96));
         card.on('pointerout', () => card.setScale(1));
-        card.on('pointerup', () => {
-            card.setScale(1);
-            wear(host, it, card);
-        });
+        card.on('pointerup', () => card.setScale(1));
+        onTap(card, () => wear(host, it, card));
         root.add(card);
     });
 }

@@ -4,7 +4,7 @@ import { Sfx } from '../audio/Sfx';
 import { COLORS, GAME_WIDTH } from '../config';
 import { KITS, type Kit } from '../data/kits';
 import { Progress } from '../state/Progress';
-import { createButton, drawBackdrop, drawCandy, drawChip, textStyle } from '../ui/widgets';
+import { createButton, drawBackdrop, drawCandy, drawChip, onTap, textStyle } from '../ui/widgets';
 
 const CARD_W = 310;
 const CARD_H = 196;
@@ -59,10 +59,8 @@ export class ShopScene extends Phaser.Scene {
             container.on('pointerdown', () => container.setScale(0.95));
             container.on('pointerout', () => container.setScale(1));
             const card: Card = { kit, container, bg, pill, status, price, priceText };
-            container.on('pointerup', () => {
-                container.setScale(1);
-                this.onTap(card);
-            });
+            container.on('pointerup', () => container.setScale(1));
+            onTap(container, () => this.onTap(card));
             return card;
         });
 

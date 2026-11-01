@@ -51,6 +51,14 @@ describe('merch', () => {
         expect(pending).toBe(merchCap(1000));
         expect(merchCap(1000)).toBe(40 * MERCH_CAP_LEVELS);
     });
+
+    it('never takes away takings already waiting when the cap drops (promo ended)', () => {
+        let pending = 0;
+        for (let i = 0; i < 50; i++) pending = accrueMerch(pending, 1000, 2);
+        expect(pending).toBe(merchCap(1000, 2));
+        // Promo over: the cap halves, but the coins already earned stay.
+        expect(accrueMerch(pending, 1000, 1)).toBe(merchCap(1000, 2));
+    });
 });
 
 describe('runModifiers', () => {

@@ -92,6 +92,39 @@ export function stallAt(p: Vec2): StallId | null {
     return null;
 }
 
+/** Seconds to stand still at a stall before its menu opens, so walking past doesn't open it. */
+export const STALL_DWELL = 0.25;
+/** Moving less than this (units) in a frame counts as standing still. */
+const STILL_EPSILON = 1e-4;
+
+/** Stall-trigger state: the stall whose menu already opened this visit, and how long the manager has stood still. */
+export interface StallTrigger {
+    at: StallId | null;
+    still: number;
+}
+
+export const NO_TRIGGER: StallTrigger = { at: null, still: 0 };
+
+/**
+ * One frame of the stall trigger. `here` is the stall under the manager,
+ * `moved` the distance walked this frame, `destination` the stall an auto-walk
+ * was sent to and `walking` whether that auto-walk is still under way. A menu
+ * opens once per visit: at once when an auto-walk arrives, otherwise after
+ * standing still for STALL_DWELL. Stalls passed during an auto-walk stay shut.
+ */
+export function stepStallTrigger(
+    t: StallTrigger,
+    f: { here: StallId | null; moved: number; dt: number; destination: StallId | null; walking: boolean }
+): { trigger: StallTrigger; open: StallId | null } {
+    const here = f.walking && f.destination && f.here !== f.destination ? null : f.here;
+    if (here === null) return { trigger: NO_TRIGGER, open: null };
+    if (here === t.at) return { trigger: { at: here, still: 0 }, open: null };
+    if (here === f.destination) return { trigger: { at: here, still: 0 }, open: here };
+    const still = f.moved > STILL_EPSILON ? 0 : t.still + f.dt;
+    if (still >= STALL_DWELL) return { trigger: { at: here, still: 0 }, open: here };
+    return { trigger: { at: t.at, still }, open: null };
+}
+
 export function inTunnel(p: Vec2): boolean {
     return p.z <= CONCOURSE.tunnelZ && Math.abs(p.x) <= CONCOURSE.tunnelHalfWidth;
 }

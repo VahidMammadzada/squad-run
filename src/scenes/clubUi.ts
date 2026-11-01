@@ -4,7 +4,7 @@ import { TEX } from '../art/textures';
 import type { StallId } from '../club/concourse';
 import type { CelebrationId, ManagerEquip } from '../club/wardrobe';
 import { COLORS } from '../config';
-import { drawCandy, textStyle } from '../ui/widgets';
+import { drawCandy, onTap, textStyle } from '../ui/widgets';
 
 export type Booth = StallId;
 
@@ -63,10 +63,8 @@ export function pillButton(
         pill.setInteractive({ useHandCursor: true });
         pill.on('pointerdown', () => pill.setScale(0.93));
         pill.on('pointerout', () => pill.setScale(1));
-        pill.on('pointerup', () => {
-            pill.setScale(1);
-            action();
-        });
+        pill.on('pointerup', () => pill.setScale(1));
+        onTap(pill, action);
     }
     return pill;
 }
