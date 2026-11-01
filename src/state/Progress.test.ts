@@ -116,3 +116,65 @@ describe('Progress kits', () => {
         expect(sdk.saveData).not.toHaveBeenCalled();
     });
 });
+
+describe('Progress stars', () => {
+    const fresh = (over: Record<string, unknown> = {}) => freshProgress({ version: 3, level: 2, coins: 5000, fans: 0, ...over });
+
+    it('signs from the transfer list; the first star becomes active', async () => {
+        const Progress = await fresh();
+        const cheap = Progress.transferList().candidates[0];
+        expect(Progress.buyStar(cheap.id)).toBe(true);
+        expect(Progress.data.roster.map((s) => s.id)).toEqual([cheap.id]);
+        expect(Progress.data.activeStar).toBe(cheap.id);
+        expect(Progress.data.roster[0].paid).toBeGreaterThan(0);
+        expect(Progress.data.coins).toBe(5000 - Progress.data.roster[0].paid);
+        // Gone from the list, can't be signed twice.
+        expect(Progress.transferList().candidates.some((s) => s.id === cheap.id)).toBe(false);
+        expect(Progress.buyStar(cheap.id)).toBe(false);
+    });
+
+    it('replaces a stale transfer list, and refreshes on demand', async () => {
+        const Progress = await fresh();
+        const first = Progress.transferList();
+        expect(Progress.transferList()).toBe(first);
+        Progress.refreshTransfer();
+        expect(Progress.transferList().candidates).not.toEqual(first.candidates);
+        for (let i = 0; i < 5; i++) Progress.completeLevel(0, 0, 0);
+        expect(Progress.transferList().refreshedAtLevel).toBe(Progress.data.level);
+    });
+
+    it('releases for half, benching the star if they were active', async () => {
+        const Progress = await fresh();
+        const id = Progress.transferList().candidates[0].id;
+        Progress.buyStar(id);
+        const paid = Progress.data.roster[0].paid;
+        const coins = Progress.data.coins;
+        expect(Progress.releaseStar(id)).toBe(Math.floor(paid / 2));
+        expect(Progress.data).toMatchObject({ coins: coins + Math.floor(paid / 2), roster: [], activeStar: null });
+    });
+
+    it('records a failed run: injury sticks, the doctor heals it', async () => {
+        const Progress = await fresh();
+        const id = Progress.transferList().candidates[0].id;
+        Progress.buyStar(id);
+        Progress.failRun(true);
+        expect(Progress.star(id)).toMatchObject({ injuredLevels: 3, fitness: 85 });
+        expect(Progress.setActiveStar(id)).toBe(false);
+        const coins = Progress.data.coins;
+        expect(Progress.healStar(id, false)).toBe(true);
+        expect(Progress.data.coins).toBe(coins - 120);
+        expect(Progress.star(id)?.injuredLevels).toBe(0);
+        expect(Progress.healStar(id, true)).toBe(false);
+    });
+
+    it('rests a tired star for coins', async () => {
+        const Progress = await fresh();
+        const id = Progress.transferList().candidates[0].id;
+        Progress.buyStar(id);
+        Progress.completeLevel(1, 0, 10);
+        expect(Progress.star(id)?.fitness).toBe(85);
+        expect(Progress.restStar(id)).toBe(true);
+        expect(Progress.star(id)?.fitness).toBe(100);
+        expect(Progress.restStar(id)).toBe(false);
+    });
+});

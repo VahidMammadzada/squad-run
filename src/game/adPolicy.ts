@@ -14,7 +14,9 @@ export const AD_CONFIG = {
 export const REWARD_IDS = {
     revive: 'revive-squad',
     tripleCoins: 'triple-coins',
-    merchDouble: 'merch-double'
+    merchDouble: 'merch-double',
+    scoutRefresh: 'scout-refresh',
+    doctorHeal: 'doctor-heal'
 } as const;
 
 /**

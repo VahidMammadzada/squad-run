@@ -2,7 +2,8 @@ import * as Phaser from 'phaser';
 import { Sfx } from '../audio/Sfx';
 import { COLORS, PITCH_CENTER, START_SQUAD } from '../config';
 import { crowdFill, fansForLevel } from '../club/fans';
-import { runModifiers, type RunModifiers } from '../club/runModifiers';
+import { activeStar, runModifiers, starLook, type RunModifiers } from '../club/runModifiers';
+import { rollInjury, type StarPlayer } from '../club/stars';
 import { getKit } from '../data/kits';
 import { adPolicy } from '../game/adPolicy';
 import { generateLevel, type LevelSpec } from '../game/levelGen';
@@ -59,6 +60,11 @@ export class GameScene extends Phaser.Scene {
     private spec!: LevelSpec;
     /** Club upgrades in effect for this run, fixed when the level starts. */
     private mods!: RunModifiers;
+    /** Star leading the squad this run, if any. */
+    private star: StarPlayer | null = null;
+    /** Star Shield not yet spent this run. */
+    private shieldReady = false;
+    private nameTag?: Phaser.GameObjects.Text;
     private squad!: Squad;
     private gatesPassed: boolean[] = [];
     private defendersDown: boolean[] = [];
@@ -90,6 +96,8 @@ export class GameScene extends Phaser.Scene {
     create(): void {
         this.spec = generateLevel(this.level);
         this.mods = runModifiers(Progress.data);
+        this.star = activeStar(Progress.data);
+        this.shieldReady = this.mods.shield !== null;
         const startSquad = START_SQUAD + this.mods.startSquadBonus;
         const kit = getKit(Progress.data.selectedKit);
         this.kitColor = kit.shirt;
@@ -99,7 +107,10 @@ export class GameScene extends Phaser.Scene {
         this.defendersDown = this.spec.defenders.map(() => false);
         this.coinsTaken = this.spec.coins.map(() => false);
 
-        this.world = new World3D(this, this.spec, kit.shirt, GOAL_DISTANCE, { crowdFill: crowdFill(Progress.data.fans) });
+        this.world = new World3D(this, this.spec, kit.shirt, GOAL_DISTANCE, {
+            crowdFill: crowdFill(Progress.data.fans),
+            leaderLook: this.star ? starLook(this.star) : undefined
+        });
         Stage.show();
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.world.dispose();
@@ -107,6 +118,7 @@ export class GameScene extends Phaser.Scene {
         });
 
         this.squadLabel = this.add.text(0, 0, '', textStyle(58)).setOrigin(0.5).setDepth(50);
+        this.nameTag = this.star ? this.add.text(0, 0, this.star.name.toUpperCase(), textStyle(24, GOLD)).setOrigin(0.5).setDepth(50) : undefined;
         this.hud = new Hud(this, this.level, kit.shirt);
         this.hud.setCoins(Progress.data.coins);
         this.hud.showHint('DRAG TO STEER');
@@ -154,8 +166,13 @@ export class GameScene extends Phaser.Scene {
     private placeSquadLabel(): void {
         const leader = this.world.squad.leaderPosition;
         const pos = this.world.project(leader.x, 1.9, leader.z);
-        this.squadLabel.setVisible(pos !== null && this.state !== 'over');
-        if (pos) this.squadLabel.setPosition(pos.x, pos.y);
+        const visible = pos !== null && this.state !== 'over';
+        this.squadLabel.setVisible(visible);
+        this.nameTag?.setVisible(visible);
+        if (pos) {
+            this.squadLabel.setPosition(pos.x, pos.y);
+            this.nameTag?.setPosition(pos.x, pos.y + 42);
+        }
     }
 
     private advance(dt: number): void {
@@ -212,11 +229,21 @@ export class GameScene extends Phaser.Scene {
             if (!touchesSquad(d.x, d.y, this.squad.x, this.dist, this.squad.count, DEFENDER_RADIUS)) return;
             this.defendersDown[i] = true;
             this.world.knockDefender(i, this.squad.x);
+            let loss = d.power;
+            if (this.shieldReady) {
+                // Star Shield: the first hit bounces off (or half of it, when the star is tired).
+                this.shieldReady = false;
+                loss = this.mods.shield === 'full' ? 0 : Math.ceil(loss / 2);
+                this.world.squadBurst(0xffd21f);
+                Sfx.play('save');
+                this.hud.popText('BLOCKED!', this.squadLabel.x, this.squadLabel.y - 90, GOLD, 52);
+                if (loss === 0) return;
+            }
             Sfx.play('hit');
             this.world.shake(0.18, 0.35);
             this.hud.flash(COLORS.gateBad, 0.25);
-            this.hud.popText(`−${d.power}`, this.squadLabel.x, this.squadLabel.y - 40, RED, 60);
-            this.setSquadCount(this.squad.count - d.power);
+            this.hud.popText(`−${loss}`, this.squadLabel.x, this.squadLabel.y - 40, RED, 60);
+            this.setSquadCount(this.squad.count - loss);
         });
     }
 
@@ -273,7 +300,7 @@ export class GameScene extends Phaser.Scene {
     private finishLevel(goals: number): void {
         this.state = 'done';
         const goalBonus = goals * COINS_PER_GOAL;
-        const fans = fansForLevel(goals, this.mods.fanClubLevel);
+        const fans = fansForLevel(goals, this.mods.fanMult);
         const { newBest } = Progress.completeLevel(goals, this.runCoins - this.bankedCoins + goalBonus, fans);
         // Counted here, so the ad cadence is the same however the player leaves the results.
         adPolicy.levelCompleted();
@@ -313,9 +340,16 @@ export class GameScene extends Phaser.Scene {
         // Coins picked up before losing are kept.
         Progress.addCoins(this.runCoins - this.bankedCoins);
         this.bankedCoins = this.runCoins;
+        // The star may get hurt; only saved if the player moves on without reviving.
+        const injured = this.star && rollInjury(Math.random()) ? { id: this.star.id, name: this.star.name } : undefined;
         Sfx.play('lose');
         this.time.delayedCall(700, () => {
-            const data: GameOverData = { level: this.level, coins: this.runCoins, canRevive: !this.revived && Playables.rewardedAvailable() };
+            const data: GameOverData = {
+                level: this.level,
+                coins: this.runCoins,
+                canRevive: !this.revived && Playables.rewardedAvailable(),
+                injuredStar: injured
+            };
             this.scene.pause();
             this.scene.launch('GameOver', data);
         });

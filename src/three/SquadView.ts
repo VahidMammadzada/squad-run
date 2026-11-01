@@ -31,8 +31,15 @@ export class SquadView {
     private readonly poses: Pose[] = [];
     private visible = true;
 
-    constructor(shirt: number, ballMaterial: THREE.Material, capacity: number, private readonly particles?: Particles) {
-        this.leaderBatch = new FigureBatch(1, { shirt, shorts: 0xffffff });
+    /** `leaderLook` dresses the leader as a star player (hair colour, gold socks). */
+    constructor(
+        shirt: number,
+        ballMaterial: THREE.Material,
+        capacity: number,
+        private readonly particles?: Particles,
+        leaderLook?: { hair: number; socks: number }
+    ) {
+        this.leaderBatch = new FigureBatch(1, { shirt, shorts: 0xffffff, ...leaderLook });
         this.mateBatch = new FigureBatch(capacity, { shirt, shorts: 0xffffff });
         this.ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.13, 1), ballMaterial);
         this.group.add(this.leaderBatch.group, this.mateBatch.group, this.ball);

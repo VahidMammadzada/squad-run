@@ -1,10 +1,11 @@
-import { UPGRADE_IDS, type UpgradeId } from '../club/balance';
+import { FITNESS_MAX, HAIR_COLORS, MAX_POPULARITY, MAX_ROSTER, SKILL_IDS, TRANSFER_SIZE, UPGRADE_IDS, type SkillId, type UpgradeId } from '../club/balance';
 import { migratedFans } from '../club/fans';
+import type { StarPlayer } from '../club/stars';
 import { maxLevel } from '../club/upgrades';
 import { DEFAULT_KIT, KITS } from '../data/kits';
 
 /** Bump when the shape changes, and teach sanitizeSave to read the old shape. */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface SaveData {
     version: number;
@@ -20,6 +21,19 @@ export interface SaveData {
     upgrades: Record<UpgradeId, number>;
     /** Merch coins waiting to be collected in the club. */
     merchPending: number;
+    /** Signed star players (max 5). */
+    roster: StarPlayer[];
+    /** Id of the star leading the squad, or null for the default leader. */
+    activeStar: string | null;
+    /** The scout's current list; null means generate a fresh one. */
+    transfer: TransferList | null;
+    /** Seed for the next generated transfer list. */
+    scoutSeed: number;
+}
+
+export interface TransferList {
+    refreshedAtLevel: number;
+    candidates: StarPlayer[];
 }
 
 function noUpgrades(): Record<UpgradeId, number> {
@@ -36,7 +50,11 @@ export function defaultSave(): SaveData {
         unlockedKits: [DEFAULT_KIT],
         selectedKit: DEFAULT_KIT,
         upgrades: noUpgrades(),
-        merchPending: 0
+        merchPending: 0,
+        roster: [],
+        activeStar: null,
+        transfer: null,
+        scoutSeed: 1
     };
 }
 
@@ -77,5 +95,38 @@ export function sanitizeSave(raw: unknown): SaveData {
             save.upgrades[id] = Math.min(maxLevel(id), wholeNumber(u[id], 0, 0));
         }
     }
+
+    // v3: star players. Older saves have none, so these fall back to defaults.
+    save.roster = sanitizeStars(r.roster, MAX_ROSTER);
+    save.activeStar = typeof r.activeStar === 'string' && save.roster.some((p) => p.id === r.activeStar) ? r.activeStar : null;
+    save.scoutSeed = wholeNumber(r.scoutSeed, 1, save.scoutSeed);
+    if (typeof r.transfer === 'object' && r.transfer !== null) {
+        const t = r.transfer as Record<string, unknown>;
+        const candidates = sanitizeStars(t.candidates, TRANSFER_SIZE);
+        if (candidates.length > 0) save.transfer = { refreshedAtLevel: wholeNumber(t.refreshedAtLevel, 1, 1), candidates };
+    }
     return save;
+}
+
+/** Keeps only well-formed stars with unique ids, repairing out-of-range numbers. */
+function sanitizeStars(raw: unknown, max: number): StarPlayer[] {
+    if (!Array.isArray(raw)) return [];
+    const out: StarPlayer[] = [];
+    for (const item of raw) {
+        if (out.length >= max || typeof item !== 'object' || item === null) continue;
+        const s = item as Record<string, unknown>;
+        if (typeof s.id !== 'string' || !s.id || out.some((p) => p.id === s.id)) continue;
+        if (typeof s.name !== 'string' || !SKILL_IDS.includes(s.skill as SkillId)) continue;
+        out.push({
+            id: s.id,
+            name: s.name.slice(0, 24),
+            popularity: Math.min(MAX_POPULARITY, wholeNumber(s.popularity, 1, 1)),
+            skill: s.skill as SkillId,
+            fitness: Math.min(FITNESS_MAX, wholeNumber(s.fitness, 0, FITNESS_MAX)),
+            injuredLevels: wholeNumber(s.injuredLevels, 0, 0),
+            hair: typeof s.hair === 'number' && Number.isInteger(s.hair) && s.hair >= 0 && s.hair <= 0xffffff ? s.hair : HAIR_COLORS[0],
+            paid: wholeNumber(s.paid, 0, 0)
+        });
+    }
+    return out;
 }

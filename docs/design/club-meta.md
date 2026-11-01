@@ -202,7 +202,14 @@ Each milestone ships on its own, and the game stays fully playable after each.
 - CLUB buttons; crowd density follows fans.
 - *Done when:* a v1 save migrates cleanly, the upgrades change the run, and the sim shows a purchase every 2–3 levels.
 
-**M2: Star players**
+**M2: Star players** — *built.* Decisions and changes from the text below:
+- Injury: 30% chance on a game over, out for 3 runs; it only sticks if the player moves on without reviving (a revive saves the star).
+- Fatigue: −15 fitness per run for the active star, +20 for the bench; below 50 the skill is half as strong (rounded down, so tired Sharpshooter does nothing).
+- All 5 skills; popularity adds +10% fans per point. Release refunds half the price (two-tap confirm).
+- Doctor is its own booth: heal 120 coins or free with a rewarded ad; rest to full for 40.
+- Tuning from the economy test: the cheapest star costs 100 (one popularity-1 player is always on the list); fan gates are 800 (popularity 4) and 2000 (popularity 5).
+- The club now has five tabs: SQUAD, SCOUT, DOCTOR, TRAINING, MERCH. Save v3.
+
 - Roster, active star as leader, the 5 skills through `RunModifiers`.
 - Scout booth (transfer list).
 - Fitness, injuries, Doctor booth with "Heal now ▶".

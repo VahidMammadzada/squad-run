@@ -10,15 +10,14 @@ import { REWARD_IDS } from '../game/adPolicy';
 import { Progress } from '../state/Progress';
 import { createRewardedButton } from '../ui/rewardedButton';
 import { createButton, drawBackdrop, drawCandy, drawChip, textStyle } from '../ui/widgets';
+import { buildDoctor, buildScout, buildSquad, CONTENT_Y, type Booth, type ClubHost } from './clubStars';
 import { startNextLevel } from './nextLevel';
 
-type Booth = 'training' | 'merch';
-
 const INK = '#1b2a5c';
-const BOOTH_W = 316;
-const BOOTH_H = 196;
-const BOOTH_Y = 370;
-const CONTENT_Y = 520;
+const TAB_W = 128;
+const TAB_H = 132;
+const TAB_GAP = 8;
+const TAB_Y = 340;
 const ROW_W = 640;
 const ROW_H = 118;
 const PILL_W = 170;
@@ -30,12 +29,14 @@ const COIN_CHIP = { x: GAME_WIDTH / 2 - 150, y: 210 };
  * contents fill the middle, PLAY and MENU sit at the bottom.
  */
 export class ClubScene extends Phaser.Scene {
-    private booth: Booth = 'training';
+    private booth: Booth = 'squad';
     private content?: Phaser.GameObjects.Container;
     private coinText!: Phaser.GameObjects.Text;
     private fanText!: Phaser.GameObjects.Text;
-    private boothCards = new Map<Booth, { container: Phaser.GameObjects.Container; bg: Phaser.GameObjects.Graphics }>();
-    private merchBadge!: Phaser.GameObjects.Container;
+    private boothCards = new Map<
+        Booth,
+        { container: Phaser.GameObjects.Container; bg: Phaser.GameObjects.Graphics; badge: Phaser.GameObjects.Container }
+    >();
     private leaving = false;
 
     constructor() {
@@ -43,7 +44,8 @@ export class ClubScene extends Phaser.Scene {
     }
 
     init(data: { booth?: Booth }): void {
-        this.booth = data.booth ?? (Progress.data.merchPending > 0 ? 'merch' : 'training');
+        const injured = Progress.data.roster.some((s) => s.injuredLevels > 0);
+        this.booth = data.booth ?? (Progress.data.merchPending > 0 ? 'merch' : injured ? 'doctor' : 'squad');
         this.leaving = false;
         this.content = undefined;
         this.boothCards.clear();
@@ -62,10 +64,15 @@ export class ClubScene extends Phaser.Scene {
         this.add.image(cx + 78, COIN_CHIP.y, TEX.fan).setScale(1.25);
         this.fanText = this.add.text(cx + 242, COIN_CHIP.y, '', textStyle(36, '#ff8fb6')).setOrigin(1, 0.5);
 
-        this.createBooth('training', cx - BOOTH_W / 2 - 10, 'TRAINING', this.add.image(0, -30, TEX.cone).setScale(1.3));
-        const shirt = this.add.image(0, -30, TEX.shirt).setTint(getKit(Progress.data.selectedKit).shirt).setScale(1.25);
-        this.createBooth('merch', cx + BOOTH_W / 2 + 10, 'MERCH', shirt);
-        this.merchBadge = this.add.container(cx + BOOTH_W + 10 - 30, BOOTH_Y - BOOTH_H / 2 + 6);
+        const tabs: [Booth, string, Phaser.GameObjects.Image][] = [
+            ['squad', 'SQUAD', this.add.image(0, -18, TEX.star).setScale(1.7)],
+            ['scout', 'SCOUT', this.add.image(0, -18, TEX.scout).setScale(0.9)],
+            ['doctor', 'DOCTOR', this.add.image(0, -18, TEX.medic).setScale(0.85)],
+            ['training', 'TRAINING', this.add.image(0, -18, TEX.cone).setScale(0.9)],
+            ['merch', 'MERCH', this.add.image(0, -18, TEX.shirt).setTint(getKit(Progress.data.selectedKit).shirt).setScale(0.9)]
+        ];
+        const left = cx - (tabs.length * TAB_W + (tabs.length - 1) * TAB_GAP) / 2 + TAB_W / 2;
+        tabs.forEach(([booth, label, icon], i) => this.createBooth(booth, left + i * (TAB_W + TAB_GAP), label, icon));
 
         createButton(this, 150, 1180, 'MENU', () => this.leave(() => this.scene.start('Title')), {
             width: 210,
@@ -91,8 +98,9 @@ export class ClubScene extends Phaser.Scene {
 
     private createBooth(booth: Booth, x: number, label: string, icon: Phaser.GameObjects.Image): void {
         const bg = this.add.graphics();
-        const name = this.add.text(0, 58, label, textStyle(38)).setOrigin(0.5);
-        const container = this.add.container(x, BOOTH_Y, [bg, icon, name]).setSize(BOOTH_W, BOOTH_H);
+        const name = this.add.text(0, 40, label, textStyle(label.length > 6 ? 21 : 24)).setOrigin(0.5);
+        const badge = this.add.container(TAB_W / 2 - 14, -TAB_H / 2 + 6);
+        const container = this.add.container(x, TAB_Y, [bg, icon, name, badge]).setSize(TAB_W, TAB_H);
         container.setInteractive({ useHandCursor: true });
         container.on('pointerdown', () => container.setScale(0.95));
         container.on('pointerout', () => container.setScale(1));
@@ -100,39 +108,78 @@ export class ClubScene extends Phaser.Scene {
             container.setScale(1);
             if (this.booth === booth) return;
             Sfx.play('click');
-            this.booth = booth;
-            this.refresh();
+            this.showBooth(booth);
         });
-        this.boothCards.set(booth, { container, bg });
+        this.boothCards.set(booth, { container, bg, badge });
+    }
+
+    private showBooth(booth: Booth): void {
+        this.booth = booth;
+        this.refresh();
+    }
+
+    /** What the star panels need from the hub. */
+    private host(): ClubHost {
+        return {
+            scene: this,
+            refresh: () => this.refresh(),
+            showBooth: (b) => this.showBooth(b),
+            isLeaving: () => this.leaving,
+            coinsChanged: () => this.bump(this.coinText)
+        };
     }
 
     private refresh(): void {
-        const { coins, fans, merchPending } = Progress.data;
+        const { coins, fans, merchPending, roster } = Progress.data;
         this.coinText.setText(String(coins));
         this.fanText.setText(String(fans));
 
-        for (const [booth, { bg, container }] of this.boothCards) {
+        // Red badges: merch takings waiting, stars needing the doctor.
+        const injured = roster.filter((s) => s.injuredLevels > 0).length;
+        const badges: Partial<Record<Booth, string>> = {
+            merch: merchPending > 0 ? `+${merchPending}` : undefined,
+            doctor: injured > 0 ? String(injured) : undefined
+        };
+
+        for (const [booth, { bg, container, badge }] of this.boothCards) {
             const selected = booth === this.booth;
             bg.clear();
-            drawCandy(bg, -BOOTH_W / 2, -BOOTH_H / 2, BOOTH_W, BOOTH_H, selected ? COLORS.buttonAccent : COLORS.panel, 30);
-            if (selected) bg.lineStyle(7, 0xffffff).strokeRoundedRect(-BOOTH_W / 2, -BOOTH_H / 2, BOOTH_W, BOOTH_H, 30);
-            container.setAlpha(selected ? 1 : 0.9);
-        }
+            drawCandy(bg, -TAB_W / 2, -TAB_H / 2, TAB_W, TAB_H, selected ? COLORS.buttonAccent : COLORS.panel, 24);
+            if (selected) bg.lineStyle(6, 0xffffff).strokeRoundedRect(-TAB_W / 2, -TAB_H / 2, TAB_W, TAB_H, 24);
+            container.setScale(selected ? 1.04 : 1);
 
-        // Red badge on MERCH while coins wait to be collected.
-        this.merchBadge.removeAll(true);
-        if (merchPending > 0) {
-            const g = this.add.graphics();
-            g.fillStyle(COLORS.ink, 0.35).fillRoundedRect(-44, -20, 88, 46, 23);
-            g.fillStyle(COLORS.gateBad).fillRoundedRect(-44, -24, 88, 46, 23);
-            g.lineStyle(4, 0xffffff).strokeRoundedRect(-44, -24, 88, 46, 23);
-            this.merchBadge.add([g, this.add.text(0, -2, `+${merchPending}`, textStyle(28)).setOrigin(0.5)]);
+            badge.removeAll(true);
+            const text = badges[booth];
+            if (text) {
+                const label = this.add.text(0, -2, text, textStyle(22)).setOrigin(0.5);
+                const w = Math.max(40, label.width + 20);
+                const g = this.add.graphics();
+                g.fillStyle(COLORS.gateBad).fillRoundedRect(-w / 2, -19, w, 38, 19);
+                g.lineStyle(3, 0xffffff).strokeRoundedRect(-w / 2, -19, w, 38, 19);
+                badge.add([g, label]);
+            }
         }
 
         this.content?.destroy(true);
         this.content = this.add.container(0, 0);
-        if (this.booth === 'training') this.buildTraining(this.content);
-        else this.buildMerch(this.content);
+        const host = this.host();
+        switch (this.booth) {
+            case 'squad':
+                buildSquad(host, this.content);
+                break;
+            case 'scout':
+                buildScout(host, this.content);
+                break;
+            case 'doctor':
+                buildDoctor(host, this.content);
+                break;
+            case 'training':
+                this.buildTraining(this.content);
+                break;
+            case 'merch':
+                this.buildMerch(this.content);
+                break;
+        }
     }
 
     // --- Training ---

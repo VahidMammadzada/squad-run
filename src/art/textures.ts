@@ -16,6 +16,12 @@ export const TEX = {
     fan: 'fan',
     /** Training cone: the Training booth. */
     cone: 'cone',
+    /** Gold star: star players and popularity pips. */
+    star: 'star',
+    /** Magnifier: the Scout booth. */
+    scout: 'scout',
+    /** Red cross: the Doctor booth. */
+    medic: 'medic',
     shirt: 'shirt',
     flag: 'flag',
     pitch: 'pitch'
@@ -76,6 +82,35 @@ export function createPlaceholderTextures(scene: Phaser.Scene): void {
         g.fillStyle(0xffffff).fillTriangle(28, 5, 22.5, 18, 33.5, 18);
         g.fillStyle(0xffffff).fillRect(16.5, 30, 23, 6);
         g.fillStyle(0xffffff, 0.35).fillTriangle(28, 8, 20, 44, 24, 44);
+    });
+
+    make(TEX.star, 34, 34, (g) => {
+        const points = (r1: number, r2: number, dy: number) =>
+            Array.from({ length: 10 }, (_, i) => {
+                const a = -Math.PI / 2 + (i * Math.PI) / 5;
+                const r = i % 2 === 0 ? r1 : r2;
+                return new Phaser.Math.Vector2(17 + Math.cos(a) * r, 17 + dy + Math.sin(a) * r);
+            });
+        g.fillStyle(COLORS.ink).fillPoints(points(16, 7.5, 1), true);
+        g.fillStyle(COLORS.gold).fillPoints(points(13, 6, 0), true);
+        g.fillStyle(0xffffff, 0.5).fillCircle(13, 12, 2.5);
+    });
+
+    make(TEX.scout, 60, 60, (g) => {
+        // Handle first, then the lens on top.
+        g.lineStyle(14, COLORS.ink).lineBetween(36, 36, 54, 54);
+        g.lineStyle(9, COLORS.buttonAccent).lineBetween(37, 37, 53, 53);
+        g.fillStyle(COLORS.ink).fillCircle(24, 24, 22);
+        g.fillStyle(0xffffff).fillCircle(24, 24, 18);
+        g.fillStyle(0x9fd8ff).fillCircle(24, 24, 14);
+        g.fillStyle(0xffffff, 0.8).fillCircle(18, 18, 5);
+    });
+
+    make(TEX.medic, 60, 60, (g) => {
+        g.fillStyle(COLORS.ink).fillRoundedRect(2, 4, 56, 54, 14);
+        g.fillStyle(0xffffff).fillRoundedRect(4, 4, 52, 50, 12);
+        g.fillStyle(COLORS.gateBad).fillRoundedRect(23, 12, 14, 34, 4);
+        g.fillStyle(COLORS.gateBad).fillRoundedRect(13, 22, 34, 14, 4);
     });
 
     // White football shirt with a navy outline; tinted with the kit colour.

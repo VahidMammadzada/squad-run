@@ -23,9 +23,11 @@ describe('upgrades', () => {
 
 describe('fans', () => {
     it('scales with goals and Fan Club', () => {
-        expect(fansForLevel(3, 0)).toBe(30);
-        expect(fansForLevel(3, 5)).toBe(45);
-        expect(fansForLevel(0, 5)).toBe(0);
+        expect(fansForLevel(3)).toBe(30);
+        expect(fansForLevel(3, 1.5)).toBe(45);
+        // No float drift: 3 goals × 1.1 is 33, not 32.
+        expect(fansForLevel(3, 1.1)).toBe(33);
+        expect(fansForLevel(0, 2)).toBe(0);
     });
 
     it('fills the crowd on a log scale, within bounds', () => {
@@ -54,7 +56,8 @@ describe('merch', () => {
 describe('runModifiers', () => {
     it('turns upgrade levels into run effects', () => {
         const mods = runModifiers({ upgrades: { youth: 2, finishing: 1, magnet: 3, fanclub: 4 } });
-        expect(mods).toMatchObject({ startSquadBonus: 2, perGoalDelta: -1, fanClubLevel: 4 });
+        expect(mods).toMatchObject({ startSquadBonus: 2, perGoalDelta: -1, shield: null });
+        expect(mods.fanMult).toBeCloseTo(1.4);
         expect(mods.coinReachMult).toBeCloseTo(1.3);
     });
 

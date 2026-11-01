@@ -43,4 +43,24 @@ describe('sanitizeSave', () => {
         expect(save.merchPending).toBe(0);
         expect(save.upgrades).toEqual({ youth: 5, magnet: 0, fanclub: 0, finishing: 1 });
     });
+
+    it('loads v1/v2 saves with no stars', () => {
+        const save = sanitizeSave({ version: 2, level: 6, fans: 90, upgrades: { youth: 1 } });
+        expect(save).toMatchObject({ version: SAVE_VERSION, roster: [], activeStar: null, transfer: null, scoutSeed: 1 });
+    });
+
+    it('keeps valid stars and repairs or drops bad ones', () => {
+        const good = { id: 'a', name: 'Rico Varga', popularity: 9, skill: 'shield', fitness: 140, injuredLevels: -2, hair: 0x123456, paid: 400 };
+        const save = sanitizeSave({
+            roster: [good, { ...good }, { id: 'b', name: 'X', skill: 'flying' }, null, { id: 'c', name: 'Kemi Bolt', skill: 'rally', hair: 'red' }],
+            activeStar: 'b',
+            transfer: { refreshedAtLevel: 3, candidates: [good] }
+        });
+        expect(save.roster.map((s) => s.id)).toEqual(['a', 'c']);
+        expect(save.roster[0]).toMatchObject({ popularity: 5, fitness: 100, injuredLevels: 0 });
+        expect(save.roster[1]).toMatchObject({ popularity: 1, fitness: 100, paid: 0 });
+        // 'b' was dropped, so nobody is active.
+        expect(save.activeStar).toBeNull();
+        expect(save.transfer?.candidates).toHaveLength(1);
+    });
 });

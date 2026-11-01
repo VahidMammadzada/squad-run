@@ -1,9 +1,10 @@
-import type { UpgradeId } from '../club/balance';
+import { HEAL_PRICE, REST_PRICE, TRANSFER_REFRESH_LEVELS, FITNESS_MAX, type UpgradeId } from '../club/balance';
 import { accrueMerch } from '../club/merch';
 import { canBuy, nextPrice } from '../club/upgrades';
+import { canSign, generateCandidates, releaseRefund, starPrice, tickRun, type StarPlayer } from '../club/stars';
 import { getKit } from '../data/kits';
 import { Playables } from '../sdk/Playables';
-import { defaultSave, sanitizeSave, type SaveData } from './saveData';
+import { defaultSave, sanitizeSave, type SaveData, type TransferList } from './saveData';
 
 let data: SaveData = defaultSave();
 
@@ -32,6 +33,7 @@ export const Progress = {
         data.coins += Math.max(0, coinsEarned);
         data.fans += Math.max(0, fansEarned);
         data.merchPending = accrueMerch(data.merchPending, data.fans);
+        data.roster = tickRun(data.roster, data.activeStar, false);
         const newBest = goals > data.bestScore;
         if (newBest) data.bestScore = goals;
         // The score sent to YouTube is fans, and must match the fans in the save.
@@ -40,6 +42,93 @@ export const Progress = {
             if (ok && fansEarned > 0) Playables.sendScore(fans);
         });
         return { newBest };
+    },
+
+    /**
+     * A run ended in failure and the player moved on (retry or menu). Not
+     * called when they revive, so a revive spares the star an injury.
+     */
+    failRun(injured: boolean): void {
+        if (data.roster.length === 0) return;
+        data.roster = tickRun(data.roster, data.activeStar, injured);
+        void this.save();
+    },
+
+    star(id: string | null): StarPlayer | undefined {
+        return data.roster.find((s) => s.id === id);
+    },
+
+    /** The scout's list, replaced with a fresh one every few levels. */
+    transferList(): TransferList {
+        const t = data.transfer;
+        if (!t || data.level - t.refreshedAtLevel >= TRANSFER_REFRESH_LEVELS) {
+            this.refreshTransfer();
+        }
+        return data.transfer!;
+    },
+
+    /** New transfer list now (rewarded refresh, or when the old one is stale). */
+    refreshTransfer(): void {
+        data.transfer = { refreshedAtLevel: data.level, candidates: generateCandidates(data.scoutSeed, data.level) };
+        data.scoutSeed++;
+        void this.save();
+    },
+
+    /** Signs a candidate from the transfer list; the first star signed becomes active. */
+    buyStar(id: string): boolean {
+        const candidate = data.transfer?.candidates.find((s) => s.id === id);
+        if (!candidate || canSign(candidate, data.coins, data.fans, data.roster) !== 'ok') return false;
+        const price = starPrice(candidate.popularity);
+        data.coins -= price;
+        data.roster.push({ ...candidate, paid: price });
+        data.transfer!.candidates = data.transfer!.candidates.filter((s) => s.id !== id);
+        if (!data.activeStar) data.activeStar = id;
+        void this.save();
+        return true;
+    },
+
+    /** Lets a star go for half what they cost. Returns the refund, or 0 if not found. */
+    releaseStar(id: string): number {
+        const star = this.star(id);
+        if (!star) return 0;
+        const refund = releaseRefund(star);
+        data.roster = data.roster.filter((s) => s.id !== id);
+        data.coins += refund;
+        if (data.activeStar === id) data.activeStar = null;
+        void this.save();
+        return refund;
+    },
+
+    /** Picks the star who leads the squad (null benches everyone). Injured stars can't start. */
+    setActiveStar(id: string | null): boolean {
+        if (id !== null) {
+            const star = this.star(id);
+            if (!star || star.injuredLevels > 0) return false;
+        }
+        if (data.activeStar === id) return true;
+        data.activeStar = id;
+        void this.save();
+        return true;
+    },
+
+    /** Doctor: ends an injury, for coins or free after a rewarded ad. */
+    healStar(id: string, free: boolean): boolean {
+        const star = this.star(id);
+        if (!star || star.injuredLevels <= 0 || (!free && data.coins < HEAL_PRICE)) return false;
+        if (!free) data.coins -= HEAL_PRICE;
+        star.injuredLevels = 0;
+        void this.save();
+        return true;
+    },
+
+    /** Doctor: restores a tired star to full fitness. */
+    restStar(id: string): boolean {
+        const star = this.star(id);
+        if (!star || star.fitness >= FITNESS_MAX || data.coins < REST_PRICE) return false;
+        data.coins -= REST_PRICE;
+        star.fitness = FITNESS_MAX;
+        void this.save();
+        return true;
     },
 
     upgradeLevel(id: UpgradeId): number {

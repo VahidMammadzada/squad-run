@@ -90,7 +90,7 @@ export class World3D {
     private readonly s = new THREE.Vector3();
     private readonly up = new THREE.Vector3(0, 1, 0);
 
-    constructor(phaserScene: Phaser.Scene, spec: LevelSpec, kitColor: number, goalDistance: number, options: { crowdFill?: number } = {}) {
+    constructor(phaserScene: Phaser.Scene, spec: LevelSpec, kitColor: number, goalDistance: number, options: { crowdFill?: number; leaderLook?: { hair: number; socks: number } } = {}) {
         this.tweens = phaserScene.tweens;
         this.goalDist = spec.length + goalDistance;
         const goalZ = -units(this.goalDist);
@@ -138,7 +138,7 @@ export class World3D {
         this.keeper = makePose({ z: goalZ + 0.4, rotY: Math.PI, armsOut: 0.45 });
         this.scene.add(this.keeperBatch.group);
 
-        this.squad = new SquadView(kitColor, this.ballMaterial, MAX_VISIBLE_MATES, this.particles);
+        this.squad = new SquadView(kitColor, this.ballMaterial, MAX_VISIBLE_MATES, this.particles, options.leaderLook);
         this.scene.add(this.squad.group, this.particles.mesh);
     }
 

@@ -1,8 +1,9 @@
-import { CROWD_MIN, CROWD_PER_DECADE, FAN_CLUB_BONUS, FANS_PER_GOAL, MIGRATED_FANS_PER_LEVEL } from './balance';
+import { CROWD_MIN, CROWD_PER_DECADE, FANS_PER_GOAL, MIGRATED_FANS_PER_LEVEL } from './balance';
 
-/** Fans a completed level earns. */
-export function fansForLevel(goals: number, fanClubLevel: number): number {
-    return Math.max(0, Math.floor(goals * FANS_PER_GOAL * (1 + FAN_CLUB_BONUS * fanClubLevel)));
+/** Fans a completed level earns; `fanMult` comes from runModifiers. */
+export function fansForLevel(goals: number, fanMult = 1): number {
+    // Rounded first so 1.1 × 30 doesn't become 32.999... → 32.
+    return Math.max(0, Math.floor(Math.round(goals * FANS_PER_GOAL * fanMult * 1000) / 1000));
 }
 
 /** Share of stand seats filled (0..1) for the 3D crowd. */
