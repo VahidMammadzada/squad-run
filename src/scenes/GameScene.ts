@@ -3,6 +3,7 @@ import { Sfx } from '../audio/Sfx';
 import { COLORS, PITCH_CENTER, START_SQUAD } from '../config';
 import { getKit } from '../data/kits';
 import { generateLevel, type LevelSpec } from '../game/levelGen';
+import { touchesSquad } from '../game/formation';
 import { applyModifier, modifierLabel } from '../game/modifiers';
 import { COINS_PER_GOAL } from '../game/scoring';
 import { runShootout } from '../game/shootout';
@@ -19,7 +20,8 @@ type State = 'ready' | 'run' | 'charge' | 'shoot' | 'over' | 'done';
 
 const STEER_GAIN = 1.4;
 const KEY_STEER_SPEED = 700;
-const COIN_PICKUP = 46;
+/** Coin pickup radius, pitch pixels. Generous: a near miss should still count. */
+const COIN_RADIUS = 40;
 const DEFENDER_RADIUS = 22;
 /** Coins picked up within this many ms of each other count as a chain (rising pitch). */
 const COIN_CHAIN_MS = 450;
@@ -190,10 +192,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     private checkDefenders(): void {
-        const reach = this.squad.radius() + DEFENDER_RADIUS;
         this.spec.defenders.forEach((d, i) => {
             if (this.defendersDown[i] || this.state !== 'run') return;
-            if (Phaser.Math.Distance.Between(d.x, d.y, this.squad.x, this.dist) > reach) return;
+            if (!touchesSquad(d.x, d.y, this.squad.x, this.dist, this.squad.count, DEFENDER_RADIUS)) return;
             this.defendersDown[i] = true;
             this.world.knockDefender(i, this.squad.x);
             Sfx.play('hit');
@@ -207,7 +208,7 @@ export class GameScene extends Phaser.Scene {
     private checkCoins(): void {
         this.spec.coins.forEach((coin, i) => {
             if (this.coinsTaken[i]) return;
-            if (Math.abs(coin.x - this.squad.x) > COIN_PICKUP || Math.abs(coin.y - this.dist) > COIN_PICKUP) return;
+            if (!touchesSquad(coin.x, coin.y, this.squad.x, this.dist, this.squad.count, COIN_RADIUS)) return;
             this.coinsTaken[i] = true;
             const at = this.world.coinPosition(i);
             const screen = this.world.project(at.x, at.y, at.z);

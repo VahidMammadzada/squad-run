@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_SQUAD, PITCH_LEFT, PITCH_RIGHT } from '../config';
+import { crowdRadius, touchesSquad } from './formation';
 import { generateLevel } from './levelGen';
 import { applyModifier, isGood, modifierLabel, type Modifier } from './modifiers';
 import { goalsFor, playersPerGoal } from './scoring';
@@ -77,5 +78,26 @@ describe('scoring', () => {
         expect(playersPerGoal(30)).toBeGreaterThan(playersPerGoal(1));
         expect(goalsFor(9, 1)).toBe(2);
         expect(goalsFor(3, 1)).toBe(0);
+    });
+});
+
+describe('touchesSquad', () => {
+    it('reaches anything inside the crowd, not just near the leader', () => {
+        // 13 players: the crowd spreads well past the leader on both sides.
+        const edge = crowdRadius(13) - 5;
+        expect(touchesSquad(300 + edge, 1000, 300, 1000, 13, 0)).toBe(true);
+        expect(touchesSquad(300 - edge, 1000, 300, 1000, 13, 0)).toBe(true);
+    });
+
+    it('adds the object radius and misses things beyond it', () => {
+        const r = crowdRadius(13);
+        expect(touchesSquad(300 + r + 20, 1000, 300, 1000, 13, 22)).toBe(true);
+        expect(touchesSquad(300 + r + 30, 1000, 300, 1000, 13, 22)).toBe(false);
+        expect(touchesSquad(300, 1000 + r + 30, 300, 1000, 13, 22)).toBe(false);
+    });
+
+    it('a lone leader only touches what is close', () => {
+        expect(touchesSquad(340, 1000, 300, 1000, 1, 22)).toBe(true);
+        expect(touchesSquad(360, 1000, 300, 1000, 1, 22)).toBe(false);
     });
 });

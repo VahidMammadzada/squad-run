@@ -13,8 +13,17 @@ export function visibleMates(count: number): number {
     return Math.max(0, Math.min(count - 1, MAX_VISIBLE_MATES));
 }
 
-/** How far from the leader the crowd reaches, in pitch pixels; used for defender contact. */
+/** How far from the leader the crowd reaches, in pitch pixels. */
 export function crowdRadius(count: number): number {
     const n = visibleMates(count);
     return n === 0 ? 20 : 42 + 14 * Math.sqrt(n - 1);
+}
+
+/**
+ * Whether something at (x, y) with radius `reach` touches the squad, whose
+ * leader is at (squadX, dist). The crowd counts, not just the leader.
+ * All values in pitch pixels.
+ */
+export function touchesSquad(x: number, y: number, squadX: number, dist: number, count: number, reach: number): boolean {
+    return Math.hypot(x - squadX, y - dist) <= crowdRadius(count) + reach;
 }

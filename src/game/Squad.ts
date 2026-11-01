@@ -1,5 +1,4 @@
 import { PITCH_LEFT, PITCH_RIGHT } from '../config';
-import { crowdRadius } from './formation';
 
 /**
  * The striker plus the crowd following them, as game state. `count` includes
@@ -19,10 +18,6 @@ export class Squad {
 
     static clampX(x: number): number {
         return Math.max(PITCH_LEFT + 20, Math.min(PITCH_RIGHT - 20, x));
-    }
-
-    radius(): number {
-        return crowdRadius(this.count);
     }
 
     update(dt: number): void {

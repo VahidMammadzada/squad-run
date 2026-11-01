@@ -121,7 +121,8 @@ export class Hud {
 
     /** Big number that pops up at a screen point and floats away, e.g. "+9" after a gate. */
     popText(text: string, x: number, y: number, color: string, size = 72): void {
-        const t = this.scene.add.text(x, y, text, textStyle(size, color)).setOrigin(0.5).setDepth(DEPTH - 1).setScrollFactor(0).setScale(0);
+        // Keep it fully on screen when the squad hugs a touchline.
+        const t = this.scene.add.text(Phaser.Math.Clamp(x, size * 1.5, GAME_WIDTH - size * 1.5), y, text, textStyle(size, color)).setOrigin(0.5).setDepth(DEPTH - 1).setScrollFactor(0).setScale(0);
         this.scene.tweens.add({ targets: t, scale: 1, duration: 220, ease: 'Back.easeOut' });
         this.scene.tweens.add({ targets: t, y: y - 150, duration: 800, ease: 'Cubic.easeOut' });
         this.scene.tweens.add({ targets: t, alpha: 0, delay: 500, duration: 300, onComplete: () => t.destroy() });
