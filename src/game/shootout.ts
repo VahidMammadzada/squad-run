@@ -41,6 +41,7 @@ export function runShootout(scene: Phaser.Scene, world: World3D, squadCount: num
                     scored += value;
                     cb.onScore(scored);
                     world.flashNet();
+                    world.goalBurst(target);
                     Sfx.play('goal');
                 } else {
                     Sfx.play('save');

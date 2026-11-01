@@ -4,9 +4,21 @@ import { COLORS, GAME_HEIGHT, GAME_WIDTH, MAX_VISIBLE_MATES, PITCH_CENTER, PITCH
 import type { LevelSpec } from '../game/levelGen';
 import { isGood, modifierLabel, type Modifier } from '../game/modifiers';
 import { FigureBatch, makePose, type Pose } from './FigureBatch';
+import { Particles } from './Particles';
 import { SquadView } from './SquadView';
 import { Stage } from './Stage';
-import { badgeTexture, ballTexture, checkerTexture, gateTexture, netTexture, pitchTexture } from './textures';
+import {
+    badgeTexture,
+    ballTexture,
+    boardTexture,
+    checkerTexture,
+    coinFaceTexture,
+    crowdTexture,
+    gateTexture,
+    netTexture,
+    pitchTexture,
+    skyTexture
+} from './textures';
 import { toWorld, units } from './units';
 
 /** Half the width of the goal mouth, in pitch pixels. */
@@ -14,9 +26,16 @@ export const GOAL_HALF_WIDTH = 140;
 const GOAL_HEIGHT = 1.3;
 const GOAL_DEPTH = 0.9;
 const PITCH_HALF = units(PITCH_RIGHT - PITCH_LEFT) / 2;
+const BASE_FOV = 55;
+/** Wider field of view on the final charge, for a sense of speed. */
+const BOOST_FOV = 64;
+const CONFETTI = [0xff3b3b, 0xffd21f, 0x2f8cff, 0x3ddc4a, 0xff5c9e, 0xffffff] as const;
 
 interface GateView {
     panels: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>[];
+    /** Per panel: shimmers to draw the eye (× and ÷), until passed. */
+    shimmer: boolean[];
+    colors: number[];
 }
 
 interface DefenderView {
@@ -39,7 +58,8 @@ interface CoinView {
  */
 export class World3D {
     readonly scene = new THREE.Scene();
-    readonly camera = new THREE.PerspectiveCamera(55, GAME_WIDTH / GAME_HEIGHT, 0.1, 120);
+    readonly camera = new THREE.PerspectiveCamera(BASE_FOV, GAME_WIDTH / GAME_HEIGHT, 0.1, 120);
+    readonly particles = new Particles();
     readonly squad: SquadView;
     /** Distance of the goal line from the start, in pitch pixels. */
     readonly goalDist: number;
@@ -60,6 +80,8 @@ export class World3D {
     private time = 0;
     private camX = 0;
     private shakeLeft = 0;
+    private shakeStrength = 0.25;
+    private boost = false;
 
     // Scratch objects reused every frame.
     private readonly m = new THREE.Matrix4();
@@ -73,10 +95,10 @@ export class World3D {
         this.goalDist = spec.length + goalDistance;
         const goalZ = -units(this.goalDist);
 
-        this.scene.background = new THREE.Color(0x8fd3ff);
-        this.scene.fog = new THREE.Fog(0x8fd3ff, 25, 70);
-        this.scene.add(new THREE.HemisphereLight(0xffffff, 0x4a7a4a, 2.2));
-        const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+        this.scene.background = skyTexture();
+        this.scene.fog = new THREE.Fog(COLORS.skyHorizon, 30, 80);
+        this.scene.add(new THREE.HemisphereLight(0xffffff, 0x9cc89c, 2.5));
+        const sun = new THREE.DirectionalLight(0xfff2d6, 1.5);
         sun.position.set(4, 10, 6);
         this.scene.add(sun);
 
@@ -86,7 +108,7 @@ export class World3D {
 
         for (const g of spec.gates) this.gates.push(this.buildGate(g.y, [g.left, g.right]));
 
-        this.defenderBatch = new FigureBatch(spec.defenders.length, { shirt: COLORS.defender, shorts: 0x111111, socks: 0x111111 });
+        this.defenderBatch = new FigureBatch(spec.defenders.length, { shirt: COLORS.defender, shorts: 0xffffff, socks: COLORS.gateBad });
         this.scene.add(this.defenderBatch.group);
         for (const d of spec.defenders) {
             const p = toWorld(d.x, d.y);
@@ -100,7 +122,10 @@ export class World3D {
         this.coins = spec.coins.map((c) => ({ ...toWorld(c.x, c.y), y: 0.45, scale: 1 }));
         this.coinMesh = new THREE.InstancedMesh(
             new THREE.CylinderGeometry(0.22, 0.22, 0.06, 20).rotateX(Math.PI / 2),
-            new THREE.MeshLambertMaterial({ color: COLORS.coin, emissive: 0x6d4c00 }),
+            [
+                new THREE.MeshPhongMaterial({ color: COLORS.coinRim, emissive: 0x5a3200, specular: 0xffffff, shininess: 60 }),
+                ...[0, 1].map(() => new THREE.MeshPhongMaterial({ map: coinFaceTexture(), emissive: 0x5a4000, specular: 0xffffff, shininess: 90 }))
+            ],
             Math.max(1, this.coins.length)
         );
         this.coinMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -109,12 +134,12 @@ export class World3D {
 
         this.net = new THREE.MeshBasicMaterial({ map: netTexture(), transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
         this.buildGoal(goalZ);
-        this.keeperBatch = new FigureBatch(1, { shirt: 0x111111, shorts: 0x111111, socks: 0x111111 });
+        this.keeperBatch = new FigureBatch(1, { shirt: COLORS.keeperTrim, shorts: COLORS.defender, socks: COLORS.keeperTrim });
         this.keeper = makePose({ z: goalZ + 0.4, rotY: Math.PI, armsOut: 0.45 });
         this.scene.add(this.keeperBatch.group);
 
-        this.squad = new SquadView(kitColor, this.ballMaterial, MAX_VISIBLE_MATES);
-        this.scene.add(this.squad.group);
+        this.squad = new SquadView(kitColor, this.ballMaterial, MAX_VISIBLE_MATES, this.particles);
+        this.scene.add(this.squad.group, this.particles.mesh);
     }
 
     private buildStadium(goalZ: number): void {
@@ -123,7 +148,7 @@ export class World3D {
         const length = start - end;
         const midZ = (start + end) / 2;
 
-        const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, length + 40).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x2f7d32 }));
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, length + 40).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: COLORS.grassB }));
         ground.position.set(0, -0.02, midZ);
         this.scene.add(ground);
 
@@ -133,16 +158,42 @@ export class World3D {
         pitch.position.set(0, 0, midZ);
         this.scene.add(pitch);
 
-        // Advertising boards and a stand on each side.
-        const boardMat = new THREE.MeshLambertMaterial({ color: 0x1565c0 });
-        const standMat = new THREE.MeshLambertMaterial({ color: 0x546e7a });
+        // Advertising boards facing the pitch, then a sloped stand full of fans.
+        const crowd = crowdTexture();
+        const standWidth = 7;
+        const tilt = 0.55;
         for (const side of [-1, 1]) {
-            const board = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, length), boardMat);
-            board.position.set(side * (PITCH_HALF + 1.2), 0.25, midZ);
-            const stand = new THREE.Mesh(new THREE.BoxGeometry(6, 3, length), standMat);
-            stand.position.set(side * (PITCH_HALF + 5), 1.2, midZ);
-            stand.rotation.z = side * 0.35;
+            const boardTex = boardTexture();
+            // Flip the right-hand boards so their text doesn't read mirrored.
+            boardTex.repeat.set((side === -1 ? 1 : -1) * (length / 12), 1);
+            const board = new THREE.Mesh(new THREE.PlaneGeometry(length, 0.55).rotateY((-side * Math.PI) / 2), new THREE.MeshBasicMaterial({ map: boardTex }));
+            board.position.set(side * (PITCH_HALF + 1.2), 0.28, midZ);
+
+            const standTex = crowd.clone();
+            standTex.repeat.set(1, length / 6);
+            standTex.needsUpdate = true;
+            const stand = new THREE.Mesh(new THREE.PlaneGeometry(standWidth, length).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: standTex }));
+            stand.rotation.z = side * tilt;
+            stand.position.set(side * (PITCH_HALF + 1.5 + (standWidth / 2) * Math.cos(tilt)), 0.2 + (standWidth / 2) * Math.sin(tilt), midZ);
             this.scene.add(board, stand);
+        }
+
+        // A stand behind the goal, then a pale city skyline fading into the sky.
+        const backTex = crowd.clone();
+        backTex.repeat.set(1, 6);
+        backTex.needsUpdate = true;
+        const back = new THREE.Mesh(new THREE.PlaneGeometry(standWidth, 40).rotateX(-Math.PI / 2).rotateY(Math.PI / 2), new THREE.MeshLambertMaterial({ map: backTex }));
+        back.rotation.x = tilt;
+        back.position.set(0, 0.2 + (standWidth / 2) * Math.sin(tilt), goalZ - 4 - (standWidth / 2) * Math.cos(tilt));
+        this.scene.add(back);
+
+        const skylineMat = new THREE.MeshBasicMaterial({ color: 0xb5dcf7, fog: false });
+        for (let i = 0; i < 18; i++) {
+            const w = 2.5 + ((i * 37) % 5);
+            const h = 2 + ((i * 53) % 5);
+            const tower = new THREE.Mesh(new THREE.BoxGeometry(w, h, 2), skylineMat);
+            tower.position.set(-34 + i * 4 + ((i * 17) % 3), h / 2 - 0.5, goalZ - 30 - ((i * 7) % 4));
+            this.scene.add(tower);
         }
     }
 
@@ -155,27 +206,32 @@ export class World3D {
 
     private buildGate(dist: number, mods: [Modifier, Modifier]): GateView {
         const z = -units(dist);
-        const width = PITCH_HALF - 0.1;
+        const width = PITCH_HALF - 0.12;
         const height = 1.5;
         const panels = mods.map((mod, side) => {
             const mat = new THREE.MeshBasicMaterial({
                 map: gateTexture(modifierLabel(mod), isGood(mod) ? COLORS.gateGood : COLORS.gateBad),
                 transparent: true,
+                opacity: 0.94,
                 depthWrite: false,
                 side: THREE.DoubleSide
             });
             const panel = new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat);
-            panel.position.set((side === 0 ? -1 : 1) * (PITCH_HALF / 2), height / 2, z);
+            panel.position.set((side === 0 ? -1 : 1) * (PITCH_HALF / 2), height / 2 + 0.05, z);
             this.scene.add(panel);
             return panel;
         });
         const postMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
         for (const x of [-PITCH_HALF, 0, PITCH_HALF]) {
-            const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, height + 0.1, 0.1), postMat);
-            post.position.set(x, (height + 0.1) / 2, z);
-            this.scene.add(post);
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, height + 0.15, 10), postMat);
+            post.position.set(x, (height + 0.15) / 2, z);
+            const cap = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), postMat);
+            cap.position.set(x, height + 0.15, z);
+            this.scene.add(post, cap);
         }
-        return { panels };
+        const shimmer = mods.map((m) => m.op === 'x' || m.op === '/');
+        const colors = mods.map((m) => (isGood(m) ? COLORS.gateGood : COLORS.gateBad));
+        return { panels, shimmer, colors };
     }
 
     private buildGoal(lineZ: number): void {
@@ -239,6 +295,7 @@ export class World3D {
     update(dt: number, squadX: number, dist: number, count: number, running: boolean): void {
         this.time += dt;
         this.squad.update(dt, squadX, dist, count, running);
+        this.particles.update(dt);
 
         for (const d of this.defenders) {
             if (!d.down) d.pose.phase += dt * 2;
@@ -255,6 +312,12 @@ export class World3D {
         this.coinMesh.count = this.coins.length;
         this.coinMesh.instanceMatrix.needsUpdate = true;
 
+        // × and ÷ gates pulse brighter; a colour above 1 brightens the texture.
+        const glow = 1 + 0.22 * (0.5 + 0.5 * Math.sin(this.time * 6));
+        for (const gate of this.gates) {
+            gate.panels.forEach((p, i) => gate.shimmer[i] && p.material.color.setScalar(glow));
+        }
+
         if (!this.keeperBusy) {
             this.keeper.x = Math.sin(this.time * 1.8) * 0.5;
             this.keeper.phase += dt * 3;
@@ -269,15 +332,45 @@ export class World3D {
         this.camera.lookAt(this.camX * 0.6, 0, leader.z - 7.5);
         if (this.shakeLeft > 0) {
             this.shakeLeft -= dt;
-            this.camera.position.x += (Math.random() - 0.5) * 0.25;
-            this.camera.position.y += (Math.random() - 0.5) * 0.25;
+            this.camera.position.x += (Math.random() - 0.5) * this.shakeStrength;
+            this.camera.position.y += (Math.random() - 0.5) * this.shakeStrength;
+        }
+        const fov = this.boost ? BOOST_FOV : BASE_FOV;
+        if (Math.abs(this.camera.fov - fov) > 0.01) {
+            this.camera.fov += (fov - this.camera.fov) * (1 - Math.exp(-3 * dt));
+            this.camera.updateProjectionMatrix();
         }
 
         Stage.render(this.scene, this.camera);
     }
 
-    shake(seconds: number): void {
+    shake(seconds: number, strength = 0.25): void {
         this.shakeLeft = seconds;
+        this.shakeStrength = strength;
+    }
+
+    /** Final-stretch speed feel: widens the field of view. */
+    setBoost(on: boolean): void {
+        this.boost = on;
+    }
+
+    /** Confetti cannons on both touchlines at `dist` (pitch pixels). */
+    confetti(dist: number): void {
+        const z = -units(dist);
+        for (const side of [-1, 1]) {
+            this.particles.burst(side * PITCH_HALF, 0.3, z, { count: 45, colors: CONFETTI, speed: 4, up: 6, life: 1.6, gravity: 6, size: 0.14 });
+        }
+    }
+
+    /** Burst of the squad's colour at the leader, when the squad grows. */
+    squadBurst(color: number): void {
+        const p = this.squad.leaderPosition;
+        this.particles.burst(p.x, 0.6, p.z, { count: 18, colors: [color, 0xffffff], speed: 3.5, up: 2.5, life: 0.6 });
+    }
+
+    goalBurst(x: number): void {
+        const lineZ = -units(this.goalDist);
+        this.particles.burst(units(x - PITCH_CENTER), 0.8, lineZ - 0.4, { count: 60, colors: CONFETTI, speed: 5, up: 4, life: 1.3, gravity: 7, size: 0.13 });
     }
 
     /** Projects a world point to Phaser game coordinates; null when behind the camera. */
@@ -288,15 +381,24 @@ export class World3D {
     }
 
     triggerGate(index: number, side: 0 | 1): void {
-        const { panels } = this.gates[index];
-        this.tweens.add({ targets: panels[side].scale, x: 1.15, y: 1.15, duration: 250 });
-        this.tweens.add({ targets: panels[side].material, opacity: 0, duration: 250 });
+        const { panels, shimmer, colors } = this.gates[index];
+        shimmer[0] = shimmer[1] = false;
+        const at = panels[side].position;
+        this.particles.burst(at.x, at.y, at.z, { count: 36, colors: [colors[side], 0xffffff], speed: 5, up: 1.5, life: 0.7, spread: 0.8, size: 0.14 });
+        // The passed panel flashes white and bursts; the other one fades back.
+        const hit = panels[side];
+        hit.material.color.setScalar(3);
+        this.tweens.add({ targets: hit.material.color, r: 1, g: 1, b: 1, duration: 300 });
+        this.tweens.add({ targets: hit.scale, x: 1.3, y: 1.3, duration: 300, ease: 'Back.easeOut' });
+        this.tweens.add({ targets: hit.material, opacity: 0, duration: 300, ease: 'Quad.easeIn' });
+        panels[1 - side].material.color.setScalar(1);
         this.tweens.add({ targets: panels[1 - side].material, opacity: 0.3, duration: 250 });
     }
 
     knockDefender(index: number, fromX: number): void {
         const d = this.defenders[index];
         d.down = true;
+        this.particles.burst(d.pose.x, 0.6, d.pose.z, { count: 16, colors: [0xffffff, 0xdfe6f0, COLORS.gateBad], speed: 3, up: 2, life: 0.5, size: 0.16 });
         const dir = d.pose.x < units(fromX - PITCH_CENTER) ? -1 : 1;
         this.tweens.add({ targets: d.pose, x: d.pose.x + dir * 2.2, z: d.pose.z - 1, roll: -dir * 1.6, duration: 450, ease: 'Quad.easeOut' });
         this.tweens.add({ targets: d.pose, y: 0.9, duration: 220, yoyo: true, ease: 'Quad.easeOut' });
@@ -306,6 +408,7 @@ export class World3D {
 
     collectCoin(index: number): void {
         const c = this.coins[index];
+        this.particles.burst(c.x, c.y, c.z, { count: 10, colors: [COLORS.coin, COLORS.coinInner, 0xffffff], speed: 2.5, up: 1.5, life: 0.4, size: 0.08 });
         this.tweens.add({ targets: c, y: 1.6, scale: 0, duration: 260, ease: 'Quad.easeOut' });
     }
 
@@ -327,6 +430,11 @@ export class World3D {
                 this.tweens.add({ targets: this.keeper, roll: 0, y: 0, armsOut: 0.45, delay: 120, duration: 200 });
             }
         });
+    }
+
+    /** Coin's position in world units, for projecting to the screen. */
+    coinPosition(index: number): { x: number; y: number; z: number } {
+        return this.coins[index];
     }
 
     /** Fires a ball from the leader at `x` (pitch pixels) on the goal line. */

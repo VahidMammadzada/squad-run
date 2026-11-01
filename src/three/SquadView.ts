@@ -1,11 +1,15 @@
 import * as THREE from 'three';
 import { SLOTS, visibleMates } from '../game/formation';
 import { FigureBatch, makePose, type Pose } from './FigureBatch';
+import type { Particles } from './Particles';
 import { toWorld } from './units';
 
 /** Stride frequency at full speed, radians per second. */
 const STRIDE = 13;
 const POP_TIME = 0.2;
+/** New mates hop as they burst out of the leader. */
+const HOP_TIME = 0.35;
+const HOP_HEIGHT = 0.45;
 const MATE_SCALE = 0.8;
 
 interface Mate {
@@ -27,7 +31,7 @@ export class SquadView {
     private readonly poses: Pose[] = [];
     private visible = true;
 
-    constructor(shirt: number, ballMaterial: THREE.Material, capacity: number) {
+    constructor(shirt: number, ballMaterial: THREE.Material, capacity: number, private readonly particles?: Particles) {
         this.leaderBatch = new FigureBatch(1, { shirt, shorts: 0xffffff });
         this.mateBatch = new FigureBatch(capacity, { shirt, shorts: 0xffffff });
         this.ball = new THREE.Mesh(new THREE.IcosahedronGeometry(0.13, 1), ballMaterial);
@@ -82,11 +86,14 @@ export class SquadView {
             p.run = run;
             p.phase += dt * STRIDE * run;
             mate.t += dt;
-            p.scale = Math.min(1, mate.t / POP_TIME) * MATE_SCALE;
+            p.scale = backOut(Math.min(1, mate.t / POP_TIME)) * MATE_SCALE;
+            p.y = mate.t < HOP_TIME ? Math.sin((mate.t / HOP_TIME) * Math.PI) * HOP_HEIGHT : 0;
             this.poses.push(p);
         });
         for (let i = this.leaving.length - 1; i >= 0; i--) {
             const mate = this.leaving[i];
+            // Leaving mates go out in a little white poof.
+            if (mate.t === 0) this.particles?.burst(mate.pose.x, 0.5, mate.pose.z, { count: 4, colors: [0xffffff, 0xe3e8f0], speed: 1.6, up: 1.2, life: 0.45, size: 0.15 });
             mate.t += dt;
             mate.pose.scale = Math.max(0, 1 - mate.t / POP_TIME) * MATE_SCALE;
             if (mate.pose.scale === 0) this.leaving.splice(i, 1);
@@ -108,4 +115,10 @@ export class SquadView {
         this.mateBatch.dispose();
         this.ball.geometry.dispose();
     }
+}
+
+/** Ease with a small overshoot, for pop-ins. */
+function backOut(t: number): number {
+    const c = 1.70158;
+    return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2;
 }

@@ -17,19 +17,25 @@ export const MAX_VISIBLE_MATES = 80;
 export const FONT = '"Arial Black", "Arial Bold", Arial, sans-serif';
 
 export const COLORS = {
-    bg: 0x0d2b12,
-    grassA: 0x3f9b3f,
-    grassB: 0x47a847,
+    bg: 0x2f8cff,
+    /** Dark navy for outlines, shadows and panels (softer than black). */
+    ink: 0x1b2a5c,
+    skyTop: 0x2f9cf4,
+    skyHorizon: 0xc9ecff,
+    grassA: 0x5fd35f,
+    grassB: 0x4fc24f,
     line: 0xffffff,
-    gateGood: 0x29b6f6,
-    gateBad: 0xef5350,
-    defender: 0x37474f,
-    coin: 0xffc107,
-    coinInner: 0xffe082,
+    gateGood: 0x1e90ff,
+    gateBad: 0xff3b3b,
+    defender: 0x23232f,
+    coin: 0xffc928,
+    coinInner: 0xfff3a0,
+    coinRim: 0xe08a00,
     keeper: 0x111111,
     keeperTrim: 0xffeb3b,
-    button: 0x43a047,
-    buttonAlt: 0x1e88e5,
-    panel: 0x10301a,
-    gold: 0xffeb3b
+    button: 0x3ddc4a,
+    buttonAlt: 0x2f8cff,
+    buttonAccent: 0xff9f1a,
+    panel: 0x23356f,
+    gold: 0xffd21f
 } as const;
