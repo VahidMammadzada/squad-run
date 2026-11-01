@@ -1,3 +1,6 @@
+import type { UpgradeId } from '../club/balance';
+import { accrueMerch } from '../club/merch';
+import { canBuy, nextPrice } from '../club/upgrades';
 import { getKit } from '../data/kits';
 import { Playables } from '../sdk/Playables';
 import { defaultSave, sanitizeSave, type SaveData } from './saveData';
@@ -24,16 +27,43 @@ export const Progress = {
         void this.save();
     },
 
-    completeLevel(goals: number, coinsEarned: number): { newBest: boolean } {
+    completeLevel(goals: number, coinsEarned: number, fansEarned: number): { newBest: boolean } {
         data.level += 1;
-        data.coins += coinsEarned;
+        data.coins += Math.max(0, coinsEarned);
+        data.fans += Math.max(0, fansEarned);
+        data.merchPending = accrueMerch(data.merchPending, data.fans);
         const newBest = goals > data.bestScore;
         if (newBest) data.bestScore = goals;
-        // The score sent to YouTube must match the best score in the save.
+        // The score sent to YouTube is fans, and must match the fans in the save.
+        const fans = data.fans;
         void this.save().then((ok) => {
-            if (ok && newBest) Playables.sendScore(data.bestScore);
+            if (ok && fansEarned > 0) Playables.sendScore(fans);
         });
         return { newBest };
+    },
+
+    upgradeLevel(id: UpgradeId): number {
+        return data.upgrades[id];
+    },
+
+    /** Buys the next level of a Training upgrade. Returns false if maxed or unaffordable. */
+    buyUpgrade(id: UpgradeId): boolean {
+        const level = data.upgrades[id];
+        if (!canBuy(id, level, data.coins)) return false;
+        data.coins -= nextPrice(id, level)!;
+        data.upgrades[id] = level + 1;
+        void this.save();
+        return true;
+    },
+
+    /** Moves pending merch coins (times `multiplier`) into the wallet; returns the amount. */
+    collectMerch(multiplier: 1 | 2): number {
+        const amount = data.merchPending * multiplier;
+        if (amount <= 0) return 0;
+        data.coins += amount;
+        data.merchPending = 0;
+        void this.save();
+        return amount;
     },
 
     isUnlocked(kitId: string): boolean {

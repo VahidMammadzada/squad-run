@@ -189,7 +189,13 @@ interface StarPlayer { id: string; name: string; popularity: number; skill: Skil
 
 Each milestone ships on its own, and the game stays fully playable after each.
 
-**M1: Fans and hub shell (vertical slice)**
+**M1: Fans and hub shell (vertical slice)** — *built.* What shipped differs from the text below in these ways:
+- "Fitness coach" was replaced by a **Fan Club** upgrade (+10% fans per level), because fitness has nothing to act on until M2's stars.
+- Fans show on Title and Level Complete, not in the in-run HUD (they only change at the end of a level).
+- No fan gates yet; the first gated items arrive with stars (M2) and stadium tiers (M3).
+- Upgrade prices were lowered and merch raised (4% of fans per level, at least 5) so the economy test keeps a purchase about every 3 levels. "Collect ×2 ▶" is only offered from 20 waiting coins.
+- MENU on Level Complete became CLUB; the kit shop opens from the Merch booth.
+
 - Save v2 and migration.
 - Fans are earned and shown on Level Complete and the HUD, and become the leaderboard value.
 - `ClubScene` with **Training** (4 upgrades) and **Merch** (existing kits plus passive income with "Collect ×2 ▶").

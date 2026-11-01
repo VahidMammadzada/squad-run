@@ -90,7 +90,7 @@ export class World3D {
     private readonly s = new THREE.Vector3();
     private readonly up = new THREE.Vector3(0, 1, 0);
 
-    constructor(phaserScene: Phaser.Scene, spec: LevelSpec, kitColor: number, goalDistance: number) {
+    constructor(phaserScene: Phaser.Scene, spec: LevelSpec, kitColor: number, goalDistance: number, options: { crowdFill?: number } = {}) {
         this.tweens = phaserScene.tweens;
         this.goalDist = spec.length + goalDistance;
         const goalZ = -units(this.goalDist);
@@ -102,7 +102,7 @@ export class World3D {
         sun.position.set(4, 10, 6);
         this.scene.add(sun);
 
-        this.buildStadium(goalZ);
+        this.buildStadium(goalZ, options.crowdFill);
         this.buildFinishLine(-units(spec.length));
         this.ballMaterial = new THREE.MeshLambertMaterial({ map: ballTexture() });
 
@@ -142,7 +142,7 @@ export class World3D {
         this.scene.add(this.squad.group, this.particles.mesh);
     }
 
-    private buildStadium(goalZ: number): void {
+    private buildStadium(goalZ: number, crowdFill?: number): void {
         const start = 25;
         const end = goalZ - 20;
         const length = start - end;
@@ -159,7 +159,7 @@ export class World3D {
         this.scene.add(pitch);
 
         // Advertising boards facing the pitch, then a sloped stand full of fans.
-        const crowd = crowdTexture();
+        const crowd = crowdTexture(crowdFill);
         const standWidth = 7;
         const tilt = 0.55;
         for (const side of [-1, 1]) {

@@ -13,9 +13,16 @@ interface ShootoutCallbacks {
 }
 
 /** The end-of-level charge on goal, played out from `planShootout`. */
-export function runShootout(scene: Phaser.Scene, world: World3D, squadCount: number, level: number, cb: ShootoutCallbacks): void {
-    const perGoal = playersPerGoal(level);
-    const { goals, worth, interval } = planShootout(squadCount, level);
+export function runShootout(
+    scene: Phaser.Scene,
+    world: World3D,
+    squadCount: number,
+    level: number,
+    perGoalDelta: number,
+    cb: ShootoutCallbacks
+): void {
+    const perGoal = playersPerGoal(level, perGoalDelta);
+    const { goals, worth, interval } = planShootout(squadCount, level, perGoalDelta);
     const shots = worth.length;
     let scored = 0;
     let count = squadCount;

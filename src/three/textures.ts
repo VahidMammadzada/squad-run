@@ -105,8 +105,11 @@ export function skyTexture(): THREE.CanvasTexture {
     });
 }
 
-/** Rows of seats with a colourful crowd; rows run along the texture's v axis. */
-export function crowdTexture(): THREE.CanvasTexture {
+/**
+ * Rows of seats with a colourful crowd; rows run along the texture's v axis.
+ * `fill` (0..1) is the share of seats taken; it grows with the club's fans.
+ */
+export function crowdTexture(fill = 0.85): THREE.CanvasTexture {
     const shirts = ['#ff3b3b', '#ffd21f', '#ffffff', '#ff9f1a', '#ff5c9e'];
     const tex = canvasTexture(256, 256, (ctx) => {
         const rows = 8;
@@ -117,7 +120,7 @@ export function crowdTexture(): THREE.CanvasTexture {
             ctx.fillStyle = 'rgba(27,42,92,0.18)';
             ctx.fillRect(r * w + w - 4, 0, 4, 256);
             for (let y = 10; y < 256; y += 22) {
-                if (Math.random() < 0.15) continue;
+                if (Math.random() >= fill) continue;
                 ctx.fillStyle = shirts[Math.floor(Math.random() * shirts.length)];
                 ctx.beginPath();
                 ctx.arc(r * w + w / 2 + (Math.random() - 0.5) * 4, y + (Math.random() - 0.5) * 4, 8, 0, Math.PI * 2);

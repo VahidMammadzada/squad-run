@@ -12,6 +12,10 @@ export const TEX = {
     mate: 'mate',
     ball: 'ball',
     coin: 'coin',
+    /** Heart: the club's fans. */
+    fan: 'fan',
+    /** Training cone: the Training booth. */
+    cone: 'cone',
     shirt: 'shirt',
     flag: 'flag',
     pitch: 'pitch'
@@ -50,6 +54,28 @@ export function createPlaceholderTextures(scene: Phaser.Scene): void {
         g.fillStyle(COLORS.coin).fillCircle(15, 14, 12);
         g.fillStyle(COLORS.coinInner).fillCircle(15, 14, 7);
         g.fillStyle(0xffffff, 0.6).fillCircle(10, 9, 3);
+    });
+
+    make(TEX.fan, 32, 30, (g) => {
+        const heart = (dy: number, color: number, r: number) => {
+            g.fillStyle(color);
+            g.fillCircle(16 - r * 0.55, 10 + dy, r);
+            g.fillCircle(16 + r * 0.55, 10 + dy, r);
+            g.fillTriangle(16 - r * 1.5, 12 + dy, 16 + r * 1.5, 12 + dy, 16, 12 + dy + r * 1.75);
+        };
+        heart(1.5, COLORS.ink, 10);
+        heart(0, 0xff4f8b, 8.5);
+        g.fillStyle(0xffffff, 0.6).fillCircle(10.5, 7, 2.5);
+    });
+
+    make(TEX.cone, 56, 60, (g) => {
+        g.fillStyle(COLORS.ink).fillRoundedRect(2, 48, 52, 11, 4);
+        g.fillStyle(COLORS.buttonAccent).fillRoundedRect(4, 46, 48, 9, 3);
+        g.fillStyle(COLORS.ink).fillTriangle(28, 1, 6, 50, 50, 50);
+        g.fillStyle(COLORS.buttonAccent).fillTriangle(28, 5, 10, 48, 46, 48);
+        g.fillStyle(0xffffff).fillTriangle(28, 5, 22.5, 18, 33.5, 18);
+        g.fillStyle(0xffffff).fillRect(16.5, 30, 23, 6);
+        g.fillStyle(0xffffff, 0.35).fillTriangle(28, 8, 20, 44, 24, 44);
     });
 
     // White football shirt with a navy outline; tinted with the kit colour.

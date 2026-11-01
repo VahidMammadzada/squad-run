@@ -2,18 +2,21 @@ import * as Phaser from 'phaser';
 import { TEX } from '../art/textures';
 import { COLORS, GAME_WIDTH } from '../config';
 import { Sfx } from '../audio/Sfx';
-import { AD_CONFIG, adPolicy, REWARD_IDS } from '../game/adPolicy';
+import { REWARD_IDS } from '../game/adPolicy';
 import { COIN_MULTIPLIER, multiplierBonus } from '../game/scoring';
 import { Playables } from '../sdk/Playables';
 import { Progress } from '../state/Progress';
 import { createRewardedButton } from '../ui/rewardedButton';
 import { createButton, createPanel, popIn, textStyle } from '../ui/widgets';
+import { startNextLevel } from './nextLevel';
 
 export interface LevelCompleteData {
     level: number;
     goals: number;
     coinsCollected: number;
     goalBonus: number;
+    /** Fans the club gained this level. */
+    fans: number;
     newBest: boolean;
 }
 
@@ -34,7 +37,7 @@ export class LevelCompleteScene extends Phaser.Scene {
 
     create(): void {
         const cx = GAME_WIDTH / 2;
-        const { level, goals, coinsCollected, goalBonus, newBest } = this.result;
+        const { level, goals, coinsCollected, goalBonus, fans, newBest } = this.result;
         const earned = coinsCollected + goalBonus;
         // The ×3 offer needs one more row; everything above it moves up to make room.
         const offer = earned > 0 && Playables.rewardedAvailable();
@@ -47,11 +50,11 @@ COMPLETE!`, textStyle(56)).setOrigin(0.5).setLineSpacing(-6);
         const goalsText = this.add.text(cx, 500 + dy, '0', textStyle(140, '#ffd21f')).setOrigin(0.5);
         popIn(this, goalsText, 150);
         this.add.text(cx, 590 + dy, goals === 1 ? 'GOAL' : 'GOALS', textStyle(40)).setOrigin(0.5);
-        const coinRow = this.add.container(cx, 668 + dy, [
-            this.add.image(-70, 0, TEX.coin).setScale(1.5),
-            this.add.text(-40, 0, '+0', textStyle(44, '#ffd21f')).setOrigin(0, 0.5)
-        ]);
-        const coinsText = coinRow.list[1] as Phaser.GameObjects.Text;
+        // Coins and fans side by side.
+        const coinsText = this.add.text(cx - 130, 668 + dy, '+0', textStyle(44, '#ffd21f')).setOrigin(0, 0.5);
+        const fansText = this.add.text(cx + 100, 668 + dy, '+0', textStyle(44, '#ff8fb6')).setOrigin(0, 0.5);
+        this.add.image(cx - 160, 668 + dy, TEX.coin).setScale(1.5);
+        this.add.image(cx + 70, 668 + dy, TEX.fan).setScale(1.4);
         const detail = this.add
             .text(cx, 718 + dy, `${coinsCollected} collected + ${goalBonus} goal bonus`, textStyle(24, '#cfe3ff', false))
             .setOrigin(0.5);
@@ -59,6 +62,7 @@ COMPLETE!`, textStyle(56)).setOrigin(0.5).setLineSpacing(-6);
         // Goals, then coins, count up.
         this.countUp(goalsText, goals, 150, '');
         this.countUp(coinsText, earned, 700, '+');
+        this.countUp(fansText, fans, 900, '+');
         if (newBest) {
             const best = this.add.text(cx, 776 + dy, 'NEW BEST!', textStyle(44, '#ffd21f')).setOrigin(0.5).setAngle(-4);
             popIn(this, best, 1300);
@@ -96,27 +100,21 @@ COMPLETE!`, textStyle(56)).setOrigin(0.5).setLineSpacing(-6);
             this,
             cx,
             nextY + 116,
-            'MENU',
+            'CLUB',
             () => {
                 if (this.leaving) return;
                 this.leaving = true;
                 this.scene.stop('Game');
-                this.scene.start('Title');
+                this.scene.start('Club');
             },
             { width: 260, height: 80, fontSize: 32, color: COLORS.buttonAlt }
         );
     }
 
-    /** Leaves through NEXT LEVEL; the one natural break where an interstitial may run. */
     private async nextLevel(): Promise<void> {
         if (this.leaving) return;
         this.leaving = true;
-        const next = Progress.data.level;
-        adPolicy.levelCompleted();
-        if (adPolicy.canShowInterstitial(next, Date.now())) {
-            if (await Playables.showInterstitial(AD_CONFIG.requestTimeoutMs)) adPolicy.interstitialShown(Date.now());
-        }
-        this.scene.start('Game', { level: next });
+        await startNextLevel(this);
     }
 
     private coinShower(): void {

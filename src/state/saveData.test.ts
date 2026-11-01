@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_KIT } from '../data/kits';
-import { defaultSave, sanitizeSave } from './saveData';
+import { defaultSave, SAVE_VERSION, sanitizeSave } from './saveData';
 
 describe('sanitizeSave', () => {
     it('returns defaults for missing or junk data', () => {
@@ -29,5 +29,18 @@ describe('sanitizeSave', () => {
         expect(save.unlockedKits).toEqual([DEFAULT_KIT, 'red']);
         // Not unlocked, so it falls back to the default kit.
         expect(save.selectedKit).toBe(DEFAULT_KIT);
+    });
+
+    it('migrates a v1 save: fans from progress, no upgrades', () => {
+        const save = sanitizeSave({ version: 1, level: 11, coins: 300, bestScore: 9, unlockedKits: ['blue'], selectedKit: 'blue' });
+        expect(save).toMatchObject({ version: SAVE_VERSION, level: 11, coins: 300, fans: 200, merchPending: 0 });
+        expect(Object.values(save.upgrades).every((l) => l === 0)).toBe(true);
+    });
+
+    it('repairs club fields', () => {
+        const save = sanitizeSave({ level: 2, fans: -5, merchPending: 'x', upgrades: { youth: 99, finishing: 1.9, bogus: 3, magnet: 'a' } });
+        expect(save.fans).toBe(0);
+        expect(save.merchPending).toBe(0);
+        expect(save.upgrades).toEqual({ youth: 5, magnet: 0, fanclub: 0, finishing: 1 });
     });
 });

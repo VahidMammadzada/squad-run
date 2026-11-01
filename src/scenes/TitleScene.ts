@@ -1,5 +1,6 @@
 import * as Phaser from 'phaser';
 import { TEX } from '../art/textures';
+import { crowdFill } from '../club/fans';
 import { COLORS, GAME_WIDTH, PITCH_CENTER } from '../config';
 import { getKit } from '../data/kits';
 import { generateLevel } from '../game/levelGen';
@@ -22,11 +23,11 @@ export class TitleScene extends Phaser.Scene {
 
     create(): void {
         const cx = GAME_WIDTH / 2;
-        const { level, bestScore, coins, selectedKit } = Progress.data;
+        const { level, fans, coins, selectedKit } = Progress.data;
         const kit = getKit(selectedKit);
 
         // The next level's stadium, with the squad jogging on the spot in the equipped kit.
-        this.world = new World3D(this, generateLevel(level), kit.shirt, GOAL_DISTANCE);
+        this.world = new World3D(this, generateLevel(level), kit.shirt, GOAL_DISTANCE, { crowdFill: crowdFill(fans) });
         Stage.show();
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.world.dispose();
@@ -48,7 +49,15 @@ export class TitleScene extends Phaser.Scene {
         this.tweens.add({ targets: logo, y: 255, angle: -2, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
         drawChip(chips, cx - 200, 448, 400, 64);
-        this.add.text(cx, 480, `LEVEL ${level}  •  BEST ${bestScore}`, textStyle(32)).setOrigin(0.5);
+        const levelText = this.add.text(0, 0, `LEVEL ${level}  •`, textStyle(32)).setOrigin(0, 0.5);
+        const fanIcon = this.add.image(0, 0, TEX.fan).setScale(1.1);
+        const fanText = this.add.text(0, 0, `${fans} FANS`, textStyle(32, '#ff8fb6')).setOrigin(0, 0.5);
+        // Centre "LEVEL n • ♥ X FANS" as one line inside the chip.
+        const width = levelText.width + 12 + fanIcon.displayWidth + 8 + fanText.width;
+        const left = cx - width / 2;
+        levelText.setPosition(left, 480);
+        fanIcon.setPosition(left + levelText.width + 12 + fanIcon.displayWidth / 2, 480);
+        fanText.setPosition(left + levelText.width + 12 + fanIcon.displayWidth + 8, 480);
 
         createButton(this, cx, 1075, 'PLAY', () => this.scene.start('Game', { level: Progress.data.level }), {
             width: 420,
@@ -56,7 +65,7 @@ export class TitleScene extends Phaser.Scene {
             fontSize: 64,
             pulse: true
         });
-        createButton(this, cx, 1196, 'SHOP', () => this.scene.start('Shop'), { width: 260, height: 78, fontSize: 36, color: COLORS.buttonAccent });
+        createButton(this, cx, 1196, 'CLUB', () => this.scene.start('Club'), { width: 260, height: 78, fontSize: 36, color: COLORS.buttonAccent });
 
         // Fine to call every time the title shows; only the first call goes through.
         Playables.gameReady();

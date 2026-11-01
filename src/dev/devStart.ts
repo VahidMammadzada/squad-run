@@ -5,7 +5,7 @@ import * as Phaser from 'phaser';
 import type { GameOverData } from '../scenes/GameOverScene';
 import type { LevelCompleteData } from '../scenes/LevelCompleteScene';
 
-const SCENES = ['Title', 'Shop', 'Game', 'LevelComplete', 'GameOver'] as const;
+const SCENES = ['Title', 'Shop', 'Club', 'Game', 'LevelComplete', 'GameOver'] as const;
 type SceneKey = (typeof SCENES)[number];
 
 /** Starts the scene named in the URL; returns false if there is none. */
@@ -19,7 +19,7 @@ export function devStartScene(boot: Phaser.Scene): boolean {
         // Overlays need a paused Game scene underneath, like in real play.
         const data: LevelCompleteData | GameOverData =
             key === 'LevelComplete'
-                ? { level, goals: 3, coinsCollected: 42, goalBonus: 30, newBest: true }
+                ? { level, goals: 3, coinsCollected: 42, goalBonus: 30, fans: 30, newBest: true }
                 : { level, coins: 17, canRevive: true };
         const game = boot.scene.get('Game');
         // After the first update, so the 3D world has rendered a frame behind the overlay.

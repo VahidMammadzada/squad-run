@@ -25,29 +25,67 @@ beforeEach(() => {
 });
 
 describe('Progress.completeLevel', () => {
-    it('sends a new best score only after the save succeeds, matching the save', async () => {
+    it('sends fans as the score only after the save succeeds, matching the save', async () => {
         const Progress = await freshProgress();
-        expect(Progress.completeLevel(7, 20)).toEqual({ newBest: true });
+        Progress.completeLevel(7, 20, 70);
         await flush();
-        expect(sdk.sendScore).toHaveBeenCalledWith(7);
-        expect(Progress.data.bestScore).toBe(7);
+        expect(Progress.data.fans).toBe(70);
+        expect(sdk.sendScore).toHaveBeenCalledWith(70);
         expect(sdk.saveData.mock.invocationCallOrder[0]).toBeLessThan(sdk.sendScore.mock.invocationCallOrder[0]);
     });
 
     it('does not send a score when the save fails', async () => {
         const Progress = await freshProgress();
         sdk.saveData.mockResolvedValue(false);
-        Progress.completeLevel(7, 0);
+        Progress.completeLevel(7, 0, 70);
         await flush();
         expect(sdk.sendScore).not.toHaveBeenCalled();
     });
 
-    it('does not send a score that is not a new best', async () => {
-        const Progress = await freshProgress({ version: 1, level: 3, coins: 0, bestScore: 10, unlockedKits: ['blue'], selectedKit: 'blue' });
-        expect(Progress.completeLevel(4, 5).newBest).toBe(false);
+    it('does not send a score when no fans were earned', async () => {
+        const Progress = await freshProgress();
+        Progress.completeLevel(0, 5, 0);
         await flush();
         expect(sdk.sendScore).not.toHaveBeenCalled();
-        expect(Progress.data).toMatchObject({ level: 4, coins: 5, bestScore: 10 });
+    });
+
+    it('still tracks the best goals for display', async () => {
+        const Progress = await freshProgress({ version: 1, level: 3, coins: 0, bestScore: 10, unlockedKits: ['blue'], selectedKit: 'blue' });
+        expect(Progress.completeLevel(4, 5, 40).newBest).toBe(false);
+        expect(Progress.completeLevel(12, 0, 120).newBest).toBe(true);
+        expect(Progress.data).toMatchObject({ level: 5, coins: 5, bestScore: 12 });
+    });
+
+    it('accrues merch takings each level', async () => {
+        const Progress = await freshProgress();
+        Progress.completeLevel(3, 0, 30);
+        expect(Progress.data.merchPending).toBeGreaterThan(0);
+    });
+});
+
+describe('Progress club', () => {
+    it('buys upgrade levels until maxed, deducting coins', async () => {
+        const Progress = await freshProgress();
+        Progress.addCoins(10_000);
+        let bought = 0;
+        while (Progress.buyUpgrade('finishing')) bought++;
+        expect(bought).toBe(3);
+        expect(Progress.upgradeLevel('finishing')).toBe(3);
+        expect(Progress.data.coins).toBe(10_000 - 200 - 500 - 1000);
+    });
+
+    it('refuses an upgrade the player cannot afford', async () => {
+        const Progress = await freshProgress();
+        expect(Progress.buyUpgrade('youth')).toBe(false);
+        expect(Progress.upgradeLevel('youth')).toBe(0);
+        expect(sdk.saveData).not.toHaveBeenCalled();
+    });
+
+    it('collects merch once, doubled when asked', async () => {
+        const Progress = await freshProgress({ version: 2, level: 4, coins: 10, merchPending: 15 });
+        expect(Progress.collectMerch(2)).toBe(30);
+        expect(Progress.data).toMatchObject({ coins: 40, merchPending: 0 });
+        expect(Progress.collectMerch(1)).toBe(0);
     });
 });
 

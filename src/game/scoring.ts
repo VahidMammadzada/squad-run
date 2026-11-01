@@ -1,10 +1,15 @@
-/** Squad members needed to beat the keeper once; the keeper gets better every few levels. */
-export function playersPerGoal(level: number): number {
-    return Math.min(4 + Math.floor((level - 1) / 4), 10);
+import { MIN_PLAYERS_PER_GOAL } from '../club/balance';
+
+/**
+ * Squad members needed to beat the keeper once; the keeper gets better every
+ * few levels. `delta` comes from club upgrades (negative is easier).
+ */
+export function playersPerGoal(level: number, delta = 0): number {
+    return Math.max(MIN_PLAYERS_PER_GOAL, Math.min(4 + Math.floor((level - 1) / 4), 10) + delta);
 }
 
-export function goalsFor(squad: number, level: number): number {
-    return Math.floor(squad / playersPerGoal(level));
+export function goalsFor(squad: number, level: number, delta = 0): number {
+    return Math.floor(squad / playersPerGoal(level, delta));
 }
 
 export const COINS_PER_GOAL = 5;

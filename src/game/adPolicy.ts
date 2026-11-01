@@ -13,7 +13,8 @@ export const AD_CONFIG = {
 /** Rewarded ad ids: stable per reward type, no user data. Don't rename once live. */
 export const REWARD_IDS = {
     revive: 'revive-squad',
-    tripleCoins: 'triple-coins'
+    tripleCoins: 'triple-coins',
+    merchDouble: 'merch-double'
 } as const;
 
 /**

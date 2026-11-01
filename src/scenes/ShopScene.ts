@@ -25,9 +25,15 @@ interface Card {
 export class ShopScene extends Phaser.Scene {
     private cards: Card[] = [];
     private coinText!: Phaser.GameObjects.Text;
+    /** Scene the BACK button returns to. */
+    private back = 'Title';
 
     constructor() {
         super('Shop');
+    }
+
+    init(data: { back?: string }): void {
+        this.back = data.back ?? 'Title';
     }
 
     create(): void {
@@ -60,7 +66,7 @@ export class ShopScene extends Phaser.Scene {
             return card;
         });
 
-        createButton(this, cx, 1196, 'BACK', () => this.scene.start('Title'), { width: 280, height: 84, color: COLORS.buttonAccent });
+        createButton(this, cx, 1196, 'BACK', () => this.scene.start(this.back, { booth: 'merch' }), { width: 280, height: 84, color: COLORS.buttonAccent });
         this.refresh();
     }
 

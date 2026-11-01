@@ -15,8 +15,8 @@ export interface ShootoutPlan {
  * Every `playersPerGoal` squad members score one goal; a squad too small to
  * score gets one shot that the keeper saves.
  */
-export function planShootout(squadCount: number, level: number): ShootoutPlan {
-    const goals = goalsFor(squadCount, level);
+export function planShootout(squadCount: number, level: number, perGoalDelta = 0): ShootoutPlan {
+    const goals = goalsFor(squadCount, level, perGoalDelta);
     const shots = goals === 0 ? 1 : Math.min(goals, MAX_SHOTS);
     const worth = Array.from({ length: shots }, (_, i) => Math.floor(goals / shots) + (i < goals % shots ? 1 : 0));
     return { goals, worth, interval: shots > 10 ? 220 : 380 };

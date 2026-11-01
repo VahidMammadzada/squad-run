@@ -1,7 +1,10 @@
 import * as Phaser from 'phaser';
 import { Sfx } from '../audio/Sfx';
 import { COLORS, PITCH_CENTER, START_SQUAD } from '../config';
+import { crowdFill, fansForLevel } from '../club/fans';
+import { runModifiers, type RunModifiers } from '../club/runModifiers';
 import { getKit } from '../data/kits';
+import { adPolicy } from '../game/adPolicy';
 import { generateLevel, type LevelSpec } from '../game/levelGen';
 import { touchesSquad } from '../game/formation';
 import { applyModifier, modifierLabel } from '../game/modifiers';
@@ -54,6 +57,8 @@ export class GameScene extends Phaser.Scene {
     private lastCoinAt = 0;
     private kitColor = 0;
     private spec!: LevelSpec;
+    /** Club upgrades in effect for this run, fixed when the level starts. */
+    private mods!: RunModifiers;
     private squad!: Squad;
     private gatesPassed: boolean[] = [];
     private defendersDown: boolean[] = [];
@@ -84,15 +89,17 @@ export class GameScene extends Phaser.Scene {
 
     create(): void {
         this.spec = generateLevel(this.level);
+        this.mods = runModifiers(Progress.data);
+        const startSquad = START_SQUAD + this.mods.startSquadBonus;
         const kit = getKit(Progress.data.selectedKit);
         this.kitColor = kit.shirt;
 
-        this.squad = new Squad(PITCH_CENTER, START_SQUAD);
+        this.squad = new Squad(PITCH_CENTER, startSquad);
         this.gatesPassed = this.spec.gates.map(() => false);
         this.defendersDown = this.spec.defenders.map(() => false);
         this.coinsTaken = this.spec.coins.map(() => false);
 
-        this.world = new World3D(this, this.spec, kit.shirt, GOAL_DISTANCE);
+        this.world = new World3D(this, this.spec, kit.shirt, GOAL_DISTANCE, { crowdFill: crowdFill(Progress.data.fans) });
         Stage.show();
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
             this.world.dispose();
@@ -103,7 +110,7 @@ export class GameScene extends Phaser.Scene {
         this.hud = new Hud(this, this.level, kit.shirt);
         this.hud.setCoins(Progress.data.coins);
         this.hud.showHint('DRAG TO STEER');
-        this.setSquadCount(START_SQUAD);
+        this.setSquadCount(startSquad);
 
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             this.dragStartX = pointer.x;
@@ -216,7 +223,7 @@ export class GameScene extends Phaser.Scene {
     private checkCoins(): void {
         this.spec.coins.forEach((coin, i) => {
             if (this.coinsTaken[i]) return;
-            if (!touchesSquad(coin.x, coin.y, this.squad.x, this.dist, this.squad.count, COIN_RADIUS)) return;
+            if (!touchesSquad(coin.x, coin.y, this.squad.x, this.dist, this.squad.count, COIN_RADIUS * this.mods.coinReachMult)) return;
             this.coinsTaken[i] = true;
             const at = this.world.coinPosition(i);
             const screen = this.world.project(at.x, at.y, at.z);
@@ -249,7 +256,7 @@ export class GameScene extends Phaser.Scene {
         this.hud.showGoals(0);
         this.world.setBoost(false);
         this.hud.stamp('SHOOT!', GOLD);
-        runShootout(this, this.world, this.squad.count, this.level, {
+        runShootout(this, this.world, this.squad.count, this.level, this.mods.perGoalDelta, {
             onSquad: (count) => this.setSquadCount(count),
             onScore: (goals) => {
                 this.hud.showGoals(goals);
@@ -266,9 +273,12 @@ export class GameScene extends Phaser.Scene {
     private finishLevel(goals: number): void {
         this.state = 'done';
         const goalBonus = goals * COINS_PER_GOAL;
-        const { newBest } = Progress.completeLevel(goals, this.runCoins - this.bankedCoins + goalBonus);
+        const fans = fansForLevel(goals, this.mods.fanClubLevel);
+        const { newBest } = Progress.completeLevel(goals, this.runCoins - this.bankedCoins + goalBonus, fans);
+        // Counted here, so the ad cadence is the same however the player leaves the results.
+        adPolicy.levelCompleted();
         Sfx.play('win');
-        const data: LevelCompleteData = { level: this.level, goals, coinsCollected: this.runCoins, goalBonus, newBest };
+        const data: LevelCompleteData = { level: this.level, goals, coinsCollected: this.runCoins, goalBonus, fans, newBest };
         this.scene.pause();
         this.scene.launch('LevelComplete', data);
     }
