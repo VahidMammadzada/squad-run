@@ -14,7 +14,8 @@ export const MAX_SQUAD = 999;
 /** Squad members beyond this are counted but not drawn. */
 export const MAX_VISIBLE_MATES = 80;
 
-export const FONT = '"Arial Black", "Arial Bold", Arial, sans-serif';
+/** Bundled display font (src/assets/fonts, OFL), loaded before the game starts; Arial Black is the fallback. */
+export const FONT = '"Lilita One", "Arial Black", "Arial Bold", Arial, sans-serif';
 
 export const COLORS = {
     bg: 0x2f8cff,

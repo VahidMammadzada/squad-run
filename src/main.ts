@@ -10,6 +10,7 @@ import { TitleScene } from './scenes/TitleScene';
 import { Playables } from './sdk/Playables';
 import { Progress } from './state/Progress';
 import { Stage } from './three/Stage';
+import lilitaUrl from './assets/fonts/LilitaOne-Regular.ttf?url';
 
 // Dev only: `?mock` installs a fake SDK with a debug panel. The DEV check is
 // constant-folded away in production builds, taking the import with it.
@@ -18,7 +19,14 @@ const sdkReady: Promise<void> =
         ? import('./sdk/mockYtgame').then((m) => m.installMockYtgame())
         : Promise.resolve();
 
-void sdkReady.then(() => Playables.boot(() => {
+// Canvas text (Phaser and the 3D gate labels) only uses a font that is already
+// loaded, so load it before anything draws. A failure just falls back to Arial Black.
+const fontReady: Promise<unknown> = new FontFace('Lilita One', `url(${lilitaUrl})`)
+    .load()
+    .then((face) => document.fonts.add(face))
+    .catch(() => undefined);
+
+void Promise.all([sdkReady, fontReady]).then(() => Playables.boot(() => {
     const game = new Phaser.Game({
         type: Phaser.AUTO,
         parent: 'game',

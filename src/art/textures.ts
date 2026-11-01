@@ -12,6 +12,8 @@ export const TEX = {
     mate: 'mate',
     ball: 'ball',
     coin: 'coin',
+    shirt: 'shirt',
+    flag: 'flag',
     pitch: 'pitch'
 } as const;
 
@@ -44,8 +46,33 @@ export function createPlaceholderTextures(scene: Phaser.Scene): void {
     });
 
     make(TEX.coin, 30, 30, (g) => {
-        g.fillStyle(COLORS.coin).fillCircle(15, 15, 14);
-        g.fillStyle(COLORS.coinInner).fillCircle(15, 15, 9);
+        g.fillStyle(COLORS.coinRim).fillCircle(15, 15, 14);
+        g.fillStyle(COLORS.coin).fillCircle(15, 14, 12);
+        g.fillStyle(COLORS.coinInner).fillCircle(15, 14, 7);
+        g.fillStyle(0xffffff, 0.6).fillCircle(10, 9, 3);
+    });
+
+    // White football shirt with a navy outline; tinted with the kit colour.
+    make(TEX.shirt, 64, 60, (g) => {
+        const shirt = [
+            [20, 4], [26, 8], [38, 8], [44, 4], [60, 14], [54, 28], [48, 25],
+            [48, 56], [16, 56], [16, 25], [10, 28], [4, 14]
+        ].map(([x, y]) => new Phaser.Math.Vector2(x, y));
+        g.fillStyle(0xffffff).fillPoints(shirt, true);
+        g.lineStyle(4, COLORS.ink).strokePoints(shirt, true);
+        g.fillStyle(0x000000, 0.12).fillRect(17, 44, 30, 11);
+    });
+
+    // Small chequered finish flag on a pole; origin is the pole's foot.
+    make(TEX.flag, 40, 48, (g) => {
+        g.fillStyle(COLORS.ink).fillRect(4, 2, 5, 46);
+        const size = 7;
+        for (let c = 0; c < 4; c++) {
+            for (let r = 0; r < 3; r++) {
+                g.fillStyle((c + r) % 2 === 0 ? 0xffffff : 0x111111).fillRect(9 + c * size, 3 + r * size, size, size);
+            }
+        }
+        g.lineStyle(2, COLORS.ink).strokeRect(9, 3, size * 4, size * 3);
     });
 
     make(TEX.pitch, GAME_WIDTH, PITCH_TILE, (g) => {

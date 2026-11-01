@@ -4,16 +4,22 @@ import { Sfx } from '../audio/Sfx';
 import { COLORS, GAME_WIDTH } from '../config';
 import { KITS, type Kit } from '../data/kits';
 import { Progress } from '../state/Progress';
-import { createButton, textStyle } from '../ui/widgets';
+import { createButton, drawBackdrop, drawCandy, drawChip, textStyle } from '../ui/widgets';
 
 const CARD_W = 310;
-const CARD_H = 190;
+const CARD_H = 196;
+const PILL_W = 220;
+const PILL_H = 50;
+const INK = '#1b2a5c';
 
 interface Card {
     kit: Kit;
     container: Phaser.GameObjects.Container;
     bg: Phaser.GameObjects.Graphics;
+    pill: Phaser.GameObjects.Graphics;
     status: Phaser.GameObjects.Text;
+    price: Phaser.GameObjects.Container;
+    priceText: Phaser.GameObjects.Text;
 }
 
 export class ShopScene extends Phaser.Scene {
@@ -26,26 +32,35 @@ export class ShopScene extends Phaser.Scene {
 
     create(): void {
         const cx = GAME_WIDTH / 2;
-        this.cameras.main.setBackgroundColor(COLORS.bg);
-        this.add.text(cx, 90, 'KITS', textStyle(72)).setOrigin(0.5);
-        this.add.image(cx - 70, 170, TEX.coin).setScale(1.2);
-        this.coinText = this.add.text(cx - 45, 170, '', textStyle(38)).setOrigin(0, 0.5);
+        drawBackdrop(this);
+        this.add.text(cx, 100, 'KITS', textStyle(84)).setOrigin(0.5).setAngle(-3);
+        drawChip(this.add.graphics(), cx - 100, 162, 200, 60);
+        this.add.image(cx - 62, 192, TEX.coin).setScale(1.25);
+        this.coinText = this.add.text(cx + 75, 192, '', textStyle(36)).setOrigin(1, 0.5);
 
         this.cards = KITS.map((kit, i) => {
             const x = cx + (i % 2 === 0 ? -1 : 1) * (CARD_W / 2 + 12);
-            const y = 330 + Math.floor(i / 2) * (CARD_H + 22);
+            const y = 345 + Math.floor(i / 2) * (CARD_H + 22);
             const bg = this.add.graphics();
-            const swatch = this.add.image(0, -40, TEX.leader).setTint(kit.shirt).setScale(1.6);
-            const name = this.add.text(0, 25, kit.name.toUpperCase(), textStyle(26)).setOrigin(0.5);
-            const status = this.add.text(0, 65, '', textStyle(24)).setOrigin(0.5);
-            const container = this.add.container(x, y, [bg, swatch, name, status]).setSize(CARD_W, CARD_H);
+            const shirt = this.add.image(0, -48, TEX.shirt).setTint(kit.shirt).setScale(1.25);
+            const name = this.add.text(0, 14, kit.name.toUpperCase(), textStyle(26, INK, false)).setOrigin(0.5);
+            const pill = this.add.graphics();
+            const status = this.add.text(0, 58, '', textStyle(24)).setOrigin(0.5);
+            const priceText = this.add.text(18, 0, '', textStyle(26)).setOrigin(0.5);
+            const price = this.add.container(0, 58, [this.add.image(-48, 0, TEX.coin), priceText]);
+            const container = this.add.container(x, y, [bg, shirt, name, pill, status, price]).setSize(CARD_W, CARD_H);
             container.setInteractive({ useHandCursor: true });
-            const card: Card = { kit, container, bg, status };
-            container.on('pointerup', () => this.onTap(card));
+            container.on('pointerdown', () => container.setScale(0.95));
+            container.on('pointerout', () => container.setScale(1));
+            const card: Card = { kit, container, bg, pill, status, price, priceText };
+            container.on('pointerup', () => {
+                container.setScale(1);
+                this.onTap(card);
+            });
             return card;
         });
 
-        createButton(this, cx, 1200, 'BACK', () => this.scene.start('Title'), { width: 300, height: 90, color: COLORS.buttonAlt });
+        createButton(this, cx, 1196, 'BACK', () => this.scene.start('Title'), { width: 280, height: 84, color: COLORS.buttonAccent });
         this.refresh();
     }
 
@@ -56,6 +71,7 @@ export class ShopScene extends Phaser.Scene {
             Progress.selectKit(kit.id);
         } else if (Progress.buyKit(kit.id)) {
             Sfx.play('coin');
+            this.tweens.add({ targets: card.container, scale: { from: 1.15, to: 1 }, duration: 300, ease: 'Back.easeOut' });
         } else {
             Sfx.play('gateBad');
             this.tweens.add({ targets: card.container, x: card.container.x + 10, duration: 50, yoyo: true, repeat: 3 });
@@ -66,19 +82,22 @@ export class ShopScene extends Phaser.Scene {
     private refresh(): void {
         const { coins, selectedKit } = Progress.data;
         this.coinText.setText(String(coins));
-        for (const { kit, bg, status } of this.cards) {
+        for (const { kit, bg, pill, status, price, priceText } of this.cards) {
             const owned = Progress.isUnlocked(kit.id);
             const equipped = selectedKit === kit.id;
+            const affordable = coins >= kit.price;
             bg.clear();
-            bg.fillStyle(0x000000, 0.35).fillRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 20);
-            bg.lineStyle(5, equipped ? COLORS.gold : 0xffffff, equipped ? 1 : 0.25).strokeRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 20);
-            if (equipped) {
-                status.setText('EQUIPPED').setColor('#ffeb3b');
-            } else if (owned) {
-                status.setText('TAP TO WEAR').setColor('#ffffff');
-            } else {
-                status.setText(`${kit.price} COINS`).setColor(coins >= kit.price ? '#a5d6a7' : '#ef9a9a');
-            }
+            bg.fillStyle(COLORS.ink, 0.3).fillRoundedRect(-CARD_W / 2, -CARD_H / 2 + 8, CARD_W, CARD_H, 26);
+            bg.fillStyle(0xffffff).fillRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 26);
+            bg.fillStyle(kit.shirt, 0.18).fillRoundedRect(-CARD_W / 2 + 10, -CARD_H / 2 + 10, CARD_W - 20, 92, 18);
+            if (equipped) bg.lineStyle(8, COLORS.gold).strokeRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 26);
+
+            pill.clear();
+            const pillColor = equipped ? COLORS.gold : owned ? COLORS.buttonAlt : affordable ? COLORS.button : 0xb0b8c8;
+            drawCandy(pill, -PILL_W / 2, 58 - PILL_H / 2, PILL_W, PILL_H, pillColor, PILL_H / 2);
+            status.setVisible(owned).setText(equipped ? 'EQUIPPED' : 'WEAR');
+            price.setVisible(!owned);
+            priceText.setText(String(kit.price));
         }
     }
 }

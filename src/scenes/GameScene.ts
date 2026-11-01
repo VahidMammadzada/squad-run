@@ -1,9 +1,9 @@
 import * as Phaser from 'phaser';
 import { Sfx } from '../audio/Sfx';
-import { PITCH_CENTER, START_SQUAD } from '../config';
+import { COLORS, PITCH_CENTER, START_SQUAD } from '../config';
 import { getKit } from '../data/kits';
 import { generateLevel, type LevelSpec } from '../game/levelGen';
-import { applyModifier } from '../game/modifiers';
+import { applyModifier, modifierLabel } from '../game/modifiers';
 import { COINS_PER_GOAL } from '../game/scoring';
 import { runShootout } from '../game/shootout';
 import { Squad } from '../game/Squad';
@@ -21,8 +21,13 @@ const STEER_GAIN = 1.4;
 const KEY_STEER_SPEED = 700;
 const COIN_PICKUP = 46;
 const DEFENDER_RADIUS = 22;
+/** Coins picked up within this many ms of each other count as a chain (rising pitch). */
+const COIN_CHAIN_MS = 450;
+const RED = '#ff5a5a';
+const BLUE = '#5ab4ff';
+const GOLD = '#ffd21f';
 /** Goal line distance past the finish, and how far in front of it the squad stops to shoot. */
-const GOAL_DISTANCE = 900;
+export const GOAL_DISTANCE = 900;
 const SHOOT_DISTANCE = 560;
 
 /**
@@ -35,6 +40,11 @@ export class GameScene extends Phaser.Scene {
     /** Distance run from the start line, in pitch pixels. */
     private dist = 0;
     private runCoins = 0;
+    /** Coins shown in the HUD; lags runCoins while coins fly to the counter. */
+    private shownCoins = 0;
+    private coinChain = 0;
+    private lastCoinAt = 0;
+    private kitColor = 0;
     private spec!: LevelSpec;
     private squad!: Squad;
     private gatesPassed: boolean[] = [];
@@ -56,11 +66,16 @@ export class GameScene extends Phaser.Scene {
         this.state = 'ready';
         this.dist = 0;
         this.runCoins = 0;
+        this.shownCoins = 0;
+        this.coinChain = 0;
+        // The tween manager outlives restarts; undo a hit-stop that was cut short.
+        this.tweens.timeScale = 1;
     }
 
     create(): void {
         this.spec = generateLevel(this.level);
         const kit = getKit(Progress.data.selectedKit);
+        this.kitColor = kit.shirt;
 
         this.squad = new Squad(PITCH_CENTER, START_SQUAD);
         this.gatesPassed = this.spec.gates.map(() => false);
@@ -74,7 +89,7 @@ export class GameScene extends Phaser.Scene {
             Stage.hide();
         });
 
-        this.squadLabel = this.add.text(0, 0, '', textStyle(40)).setOrigin(0.5).setDepth(50);
+        this.squadLabel = this.add.text(0, 0, '', textStyle(58)).setOrigin(0.5).setDepth(50);
         this.hud = new Hud(this, this.level, kit.shirt);
         this.hud.setCoins(Progress.data.coins);
         this.hud.showHint('DRAG TO STEER');
@@ -145,6 +160,9 @@ export class GameScene extends Phaser.Scene {
         this.hud.setProgress(this.dist / this.spec.length);
         if (this.state === 'run' && this.dist >= this.spec.length) {
             this.state = 'charge';
+            this.world.setBoost(true);
+            this.world.confetti(this.spec.length);
+            Sfx.play('win');
         }
     }
 
@@ -154,9 +172,19 @@ export class GameScene extends Phaser.Scene {
             this.gatesPassed[i] = true;
             const side = this.squad.x < PITCH_CENTER ? 0 : 1;
             this.world.triggerGate(i, side);
+            const mod = side === 0 ? gate.left : gate.right;
             const before = this.squad.count;
-            const after = applyModifier(before, side === 0 ? gate.left : gate.right);
-            Sfx.play(after >= before ? 'gateGood' : 'gateBad');
+            const after = applyModifier(before, mod);
+            const label = this.squadLabel;
+            if (after >= before) {
+                Sfx.play('gateGood');
+                this.hud.popText(modifierLabel(mod), label.x, label.y - 40, BLUE);
+                this.world.squadBurst(this.kitColor);
+            } else {
+                Sfx.play('gateBad');
+                this.hud.popText(modifierLabel(mod), label.x, label.y - 40, RED);
+                this.hud.flash(COLORS.gateBad, 0.2);
+            }
             this.setSquadCount(after);
         });
     }
@@ -169,7 +197,9 @@ export class GameScene extends Phaser.Scene {
             this.defendersDown[i] = true;
             this.world.knockDefender(i, this.squad.x);
             Sfx.play('hit');
-            this.world.shake(0.15);
+            this.world.shake(0.18, 0.35);
+            this.hud.flash(COLORS.gateBad, 0.25);
+            this.hud.popText(`−${d.power}`, this.squadLabel.x, this.squadLabel.y - 40, RED, 60);
             this.setSquadCount(this.squad.count - d.power);
         });
     }
@@ -179,10 +209,19 @@ export class GameScene extends Phaser.Scene {
             if (this.coinsTaken[i]) return;
             if (Math.abs(coin.x - this.squad.x) > COIN_PICKUP || Math.abs(coin.y - this.dist) > COIN_PICKUP) return;
             this.coinsTaken[i] = true;
+            const at = this.world.coinPosition(i);
+            const screen = this.world.project(at.x, at.y, at.z);
             this.world.collectCoin(i);
             this.runCoins++;
-            this.hud.setCoins(Progress.data.coins + this.runCoins);
-            Sfx.play('coin');
+            this.coinChain = this.time.now - this.lastCoinAt < COIN_CHAIN_MS ? Math.min(this.coinChain + 1, 10) : 0;
+            this.lastCoinAt = this.time.now;
+            Sfx.play('coin', 1 + this.coinChain * 0.06);
+            const arrive = () => {
+                this.shownCoins++;
+                this.hud.setCoins(Progress.data.coins + this.shownCoins);
+            };
+            if (screen) this.hud.flyCoin(screen.x, screen.y, arrive);
+            else arrive();
         });
     }
 
@@ -199,9 +238,18 @@ export class GameScene extends Phaser.Scene {
         this.state = 'shoot';
         this.hud.setProgress(1);
         this.hud.showGoals(0);
+        this.world.setBoost(false);
+        this.hud.stamp('SHOOT!', GOLD);
         runShootout(this, this.world, this.squad.count, this.level, {
             onSquad: (count) => this.setSquadCount(count),
-            onScore: (goals) => this.hud.showGoals(goals),
+            onScore: (goals) => {
+                this.hud.showGoals(goals);
+                this.hud.stamp('GOAL!', GOLD);
+                this.world.shake(0.15, 0.2);
+                // Hit-stop: tweens (ball, keeper) nearly freeze for a moment.
+                this.tweens.timeScale = 0.15;
+                this.time.delayedCall(130, () => (this.tweens.timeScale = 1));
+            },
             onDone: (goals) => this.finishLevel(goals)
         });
     }

@@ -61,7 +61,8 @@ export const Sfx = {
         window.addEventListener('keydown', unlock, { once: true });
     },
 
-    play(name: SfxName): void {
+    /** @param pitch frequency multiplier, e.g. rising pitch on coin chains */
+    play(name: SfxName, pitch = 1): void {
         if (!ctx || !enabled || paused) return;
         const now = ctx.currentTime;
         for (const tone of SOUNDS[name]) {
@@ -70,8 +71,8 @@ export const Sfx = {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.type = tone.type ?? 'sine';
-            osc.frequency.setValueAtTime(tone.freq, start);
-            if (tone.to) osc.frequency.exponentialRampToValueAtTime(tone.to, end);
+            osc.frequency.setValueAtTime(tone.freq * pitch, start);
+            if (tone.to) osc.frequency.exponentialRampToValueAtTime(tone.to * pitch, end);
             gain.gain.setValueAtTime(tone.vol ?? 0.15, start);
             gain.gain.exponentialRampToValueAtTime(0.001, end);
             osc.connect(gain).connect(ctx.destination);
