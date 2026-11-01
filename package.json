@@ -1,0 +1,25 @@
+{
+  "name": "squad-run",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0",
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.170.0",
+    "terser": "^5.39.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.6",
+    "vitest": "^3.2.4"
+  }
+}
