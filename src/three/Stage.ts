@@ -53,5 +53,13 @@ export const Stage = {
 
     render(scene: THREE.Scene, camera: THREE.Camera): void {
         renderer?.render(scene, camera);
+    },
+
+    /** Last frame's draw calls and triangles, and the drawing buffer size (for the `?fps` meter). */
+    stats(): { calls: number; triangles: number; width: number; height: number } | null {
+        if (!renderer) return null;
+        const { calls, triangles } = renderer.info.render;
+        const el = renderer.domElement;
+        return { calls, triangles, width: el.width, height: el.height };
     }
 };

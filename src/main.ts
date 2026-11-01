@@ -47,6 +47,8 @@ void Promise.all([sdkReady, fontReady]).then(() => Playables.boot(() => {
         scene: [BootScene, TitleScene, GameScene, LevelCompleteScene, GameOverScene, ShopScene, StadiumScene, StallPanelScene]
     });
     Stage.attach(game);
+    // `?fps` shows a frame-rate meter, also in production builds, for phone checks.
+    if (new URLSearchParams(location.search).has('fps')) void import('./dev/fpsMeter').then((m) => m.installFpsMeter());
     // Dev only: lets scripts/capture.mjs see which scenes are running.
     if (import.meta.env.DEV) (window as unknown as { __game: Phaser.Game }).__game = game;
 

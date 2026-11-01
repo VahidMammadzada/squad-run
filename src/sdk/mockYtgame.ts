@@ -16,7 +16,7 @@ export function installMockYtgame(): void {
     let audio = true;
     let loaded = false;
     let failNextSave = false;
-    let adMode: 'ok' | 'fail' | 'slow' = 'ok';
+    let adMode: 'ok' | 'fail' | 'slow' | 'hang' = 'ok';
     const pauseListeners = new Set<Listener>();
     const resumeListeners = new Set<Listener>();
     const audioListeners = new Set<Listener<[boolean]>>();
@@ -72,6 +72,8 @@ export function installMockYtgame(): void {
                 log('requestInterstitialAd, mode:', adMode);
                 if (adMode === 'fail') throw new Error('mock ad failure');
                 if (adMode === 'slow') await new Promise((r) => setTimeout(r, 3000));
+                // Never settles: the game must give up after AD_CONFIG.requestTimeoutMs and carry on.
+                if (adMode === 'hang') await new Promise(() => undefined);
                 log('requestInterstitialAd → done');
             },
             requestRewardedAd: async (id: string) => {
@@ -98,8 +100,8 @@ export function installMockYtgame(): void {
         // Load happens once at boot, so this flag survives a reload.
         ['Fail next load', () => (sessionStorage.setItem(FAIL_LOAD_KEY, '1'), log('next loadData will fail; reload the page'))],
         ['Fail next save', () => (failNextSave = true, log('next saveData will fail'))],
-        ['Ads: ok/fail/slow', () => {
-            adMode = adMode === 'ok' ? 'fail' : adMode === 'fail' ? 'slow' : 'ok';
+        ['Ads: ok/fail/slow/hang', () => {
+            adMode = adMode === 'ok' ? 'fail' : adMode === 'fail' ? 'slow' : adMode === 'slow' ? 'hang' : 'ok';
             log('ad mode →', adMode);
         }],
         ['Clear save', () => (localStorage.removeItem(SAVE_KEY), log('save cleared'))]
