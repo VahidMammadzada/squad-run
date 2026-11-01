@@ -5,9 +5,11 @@ import { getKit } from '../data/kits';
 import { generateLevel, type LevelSpec } from '../game/levelGen';
 import { touchesSquad } from '../game/formation';
 import { applyModifier, modifierLabel } from '../game/modifiers';
+import { defendersToClear, REVIVE_SQUAD } from '../game/revive';
 import { COINS_PER_GOAL } from '../game/scoring';
 import { runShootout } from '../game/shootout';
 import { Squad } from '../game/Squad';
+import { Playables } from '../sdk/Playables';
 import { Progress } from '../state/Progress';
 import { Stage } from '../three/Stage';
 import { World3D } from '../three/World3D';
@@ -42,6 +44,10 @@ export class GameScene extends Phaser.Scene {
     /** Distance run from the start line, in pitch pixels. */
     private dist = 0;
     private runCoins = 0;
+    /** Coins already added to the save (on game over), so a revived run doesn't count them twice. */
+    private bankedCoins = 0;
+    /** One rewarded revive per attempt. */
+    private revived = false;
     /** Coins shown in the HUD; lags runCoins while coins fly to the counter. */
     private shownCoins = 0;
     private coinChain = 0;
@@ -68,6 +74,8 @@ export class GameScene extends Phaser.Scene {
         this.state = 'ready';
         this.dist = 0;
         this.runCoins = 0;
+        this.bankedCoins = 0;
+        this.revived = false;
         this.shownCoins = 0;
         this.coinChain = 0;
         // The tween manager outlives restarts; undo a hit-stop that was cut short.
@@ -219,7 +227,7 @@ export class GameScene extends Phaser.Scene {
             Sfx.play('coin', 1 + this.coinChain * 0.06);
             const arrive = () => {
                 this.shownCoins++;
-                this.hud.setCoins(Progress.data.coins + this.shownCoins);
+                this.hud.setCoins(Progress.data.coins + this.shownCoins - this.bankedCoins);
             };
             if (screen) this.hud.flyCoin(screen.x, screen.y, arrive);
             else arrive();
@@ -258,11 +266,34 @@ export class GameScene extends Phaser.Scene {
     private finishLevel(goals: number): void {
         this.state = 'done';
         const goalBonus = goals * COINS_PER_GOAL;
-        const { newBest } = Progress.completeLevel(goals, this.runCoins + goalBonus);
+        const { newBest } = Progress.completeLevel(goals, this.runCoins - this.bankedCoins + goalBonus);
         Sfx.play('win');
         const data: LevelCompleteData = { level: this.level, goals, coinsCollected: this.runCoins, goalBonus, newBest };
         this.scene.pause();
         this.scene.launch('LevelComplete', data);
+    }
+
+    /**
+     * Called by the GameOver overlay after a rewarded ad was earned: the squad
+     * comes back where it fell, with the nearby defenders cleared, and waits for
+     * a touch before running on.
+     */
+    revive(): void {
+        if (this.state !== 'over' || this.revived) return;
+        this.revived = true;
+        this.scene.resume();
+        for (const i of defendersToClear(this.spec.defenders, this.defendersDown, this.dist)) {
+            this.defendersDown[i] = true;
+            this.world.knockDefender(i, this.squad.x);
+        }
+        this.world.squad.revive();
+        this.state = 'ready';
+        this.setSquadCount(REVIVE_SQUAD);
+        this.world.squadBurst(this.kitColor);
+        this.world.shake(0.15, 0.2);
+        Sfx.play('gateGood');
+        this.hud.stamp('REVIVED!', GOLD);
+        this.hud.showHint('DRAG TO GO');
     }
 
     private gameOver(): void {
@@ -270,10 +301,11 @@ export class GameScene extends Phaser.Scene {
         this.state = 'over';
         this.world.squad.wipeOut();
         // Coins picked up before losing are kept.
-        Progress.addCoins(this.runCoins);
+        Progress.addCoins(this.runCoins - this.bankedCoins);
+        this.bankedCoins = this.runCoins;
         Sfx.play('lose');
         this.time.delayedCall(700, () => {
-            const data: GameOverData = { level: this.level, coins: this.runCoins };
+            const data: GameOverData = { level: this.level, coins: this.runCoins, canRevive: !this.revived && Playables.rewardedAvailable() };
             this.scene.pause();
             this.scene.launch('GameOver', data);
         });

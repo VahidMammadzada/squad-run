@@ -4,6 +4,8 @@
 export interface YtGame {
     SDK_VERSION: string;
     IN_PLAYABLES_ENV: boolean;
+    /** Values of SdkError.errorType; optional so test fakes can leave it out. */
+    SdkErrorType?: { API_UNAVAILABLE: unknown };
     game: {
         firstFrameReady(): void;
         gameReady(): void;
@@ -15,6 +17,12 @@ export interface YtGame {
         onAudioEnabledChange(callback: (enabled: boolean) => void): () => void;
         onPause(callback: () => void): () => void;
         onResume(callback: () => void): () => void;
+    };
+    ads: {
+        /** Resolves on a successful request (no guarantee an ad was shown); rejects otherwise. */
+        requestInterstitialAd(): Promise<void>;
+        /** Resolves true if the player earned the reward. The id must be stable and carry no user data. */
+        requestRewardedAd(rewardId: string): Promise<boolean>;
     };
     engagement: {
         sendScore(score: { value: number }): Promise<void>;

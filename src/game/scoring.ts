@@ -8,3 +8,10 @@ export function goalsFor(squad: number, level: number): number {
 }
 
 export const COINS_PER_GOAL = 5;
+/** The rewarded "×3 coins" offer on the level-complete screen. */
+export const COIN_MULTIPLIER = 3;
+
+/** Extra coins the multiplier adds on top of what the level already paid. */
+export function multiplierBonus(earned: number): number {
+    return Math.max(0, Math.floor(earned)) * (COIN_MULTIPLIER - 1);
+}

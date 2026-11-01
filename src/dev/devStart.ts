@@ -20,7 +20,7 @@ export function devStartScene(boot: Phaser.Scene): boolean {
         const data: LevelCompleteData | GameOverData =
             key === 'LevelComplete'
                 ? { level, goals: 3, coinsCollected: 42, goalBonus: 30, newBest: true }
-                : { level, coins: 17 };
+                : { level, coins: 17, canRevive: true };
         const game = boot.scene.get('Game');
         // After the first update, so the 3D world has rendered a frame behind the overlay.
         game.events.once(Phaser.Scenes.Events.POST_UPDATE, () => {

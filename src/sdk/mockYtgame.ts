@@ -16,6 +16,7 @@ export function installMockYtgame(): void {
     let audio = true;
     let loaded = false;
     let failNextSave = false;
+    let adMode: 'ok' | 'fail' | 'slow' = 'ok';
     const pauseListeners = new Set<Listener>();
     const resumeListeners = new Set<Listener>();
     const audioListeners = new Set<Listener<[boolean]>>();
@@ -66,6 +67,20 @@ export function installMockYtgame(): void {
             onPause: (cb) => subscribe(pauseListeners, cb),
             onResume: (cb) => subscribe(resumeListeners, cb)
         },
+        ads: {
+            requestInterstitialAd: async () => {
+                log('requestInterstitialAd, mode:', adMode);
+                if (adMode === 'fail') throw new Error('mock ad failure');
+                if (adMode === 'slow') await new Promise((r) => setTimeout(r, 3000));
+                log('requestInterstitialAd → done');
+            },
+            requestRewardedAd: async (id: string) => {
+                log('requestRewardedAd', id, 'mode:', adMode);
+                if (adMode === 'fail') throw new Error('mock ad failure');
+                if (adMode === 'slow') await new Promise((r) => setTimeout(r, 3000));
+                return true;
+            }
+        },
         engagement: {
             sendScore: async ({ value }) => log('sendScore', value)
         }
@@ -83,6 +98,10 @@ export function installMockYtgame(): void {
         // Load happens once at boot, so this flag survives a reload.
         ['Fail next load', () => (sessionStorage.setItem(FAIL_LOAD_KEY, '1'), log('next loadData will fail; reload the page'))],
         ['Fail next save', () => (failNextSave = true, log('next saveData will fail'))],
+        ['Ads: ok/fail/slow', () => {
+            adMode = adMode === 'ok' ? 'fail' : adMode === 'fail' ? 'slow' : 'ok';
+            log('ad mode →', adMode);
+        }],
         ['Clear save', () => (localStorage.removeItem(SAVE_KEY), log('save cleared'))]
     ];
 

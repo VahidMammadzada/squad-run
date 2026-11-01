@@ -57,6 +57,12 @@ export class SquadView {
         this.leaving.push(...this.mates.splice(0).map((m) => ({ pose: m.pose, t: 0 })));
     }
 
+    /** Undoes wipeOut; mates pop back in on the next update. */
+    revive(): void {
+        this.visible = true;
+        this.ball.visible = true;
+    }
+
     /**
      * @param x leader position across the pitch, pitch pixels
      * @param dist distance run, pitch pixels
