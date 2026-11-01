@@ -8,7 +8,6 @@ import { Playables } from '../sdk/Playables';
 import { Progress } from '../state/Progress';
 import { createRewardedButton } from '../ui/rewardedButton';
 import { createButton, createPanel, popIn, textStyle } from '../ui/widgets';
-import { startNextLevel } from './nextLevel';
 
 export interface LevelCompleteData {
     level: number;
@@ -89,32 +88,34 @@ COMPLETE!`, textStyle(56)).setOrigin(0.5).setLineSpacing(-6);
             : null;
         const nextY = tripled ? 932 : 872;
 
-        // NEXT LEVEL stays a full-size button: carrying on without the ad must always be easy.
-        createButton(this, cx, nextY, 'NEXT LEVEL', () => void this.nextLevel(), {
+        // Every level ends in the stadium, where PLAY starts the next one. This
+        // button stays full-size: carrying on without the ad must always be easy.
+        createButton(this, cx, nextY, 'TO THE STADIUM', () => this.toStadium(), {
             width: 420,
             height: 110,
-            fontSize: 48,
+            fontSize: 40,
             pulse: !tripled
         });
         createButton(
             this,
             cx,
             nextY + 116,
-            'CLUB',
+            'MENU',
             () => {
                 if (this.leaving) return;
                 this.leaving = true;
                 this.scene.stop('Game');
-                this.scene.start('Club');
+                this.scene.start('Title');
             },
             { width: 260, height: 80, fontSize: 32, color: COLORS.buttonAlt }
         );
     }
 
-    private async nextLevel(): Promise<void> {
+    private toStadium(): void {
         if (this.leaving) return;
         this.leaving = true;
-        await startNextLevel(this);
+        this.scene.stop('Game');
+        this.scene.start('Stadium');
     }
 
     private coinShower(): void {

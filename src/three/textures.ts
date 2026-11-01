@@ -232,3 +232,61 @@ export function ballTexture(): THREE.CanvasTexture {
         }
     });
 }
+
+/** A stall's sign over the counter: bold label on a candy-coloured board. */
+export function stallSignTexture(label: string, color: number): THREE.CanvasTexture {
+    return canvasTexture(512, 128, (ctx) => {
+        ctx.fillStyle = css(COLORS.ink);
+        ctx.beginPath();
+        ctx.roundRect(0, 6, 512, 122, 30);
+        ctx.fill();
+        ctx.fillStyle = css(color);
+        ctx.beginPath();
+        ctx.roundRect(0, 0, 512, 118, 30);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.22)';
+        ctx.beginPath();
+        ctx.roundRect(14, 10, 484, 44, 20);
+        ctx.fill();
+        ctx.font = `64px ${FONT}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 12;
+        ctx.strokeStyle = css(COLORS.ink);
+        ctx.strokeText(label, 256, 64);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(label, 256, 64);
+    });
+}
+
+/** Striped market-stall awning in a colour and white. */
+export function awningTexture(color: number): THREE.CanvasTexture {
+    const tex = canvasTexture(128, 64, (ctx) => {
+        for (let i = 0; i < 8; i++) {
+            ctx.fillStyle = i % 2 === 0 ? css(color) : '#ffffff';
+            ctx.fillRect(i * 16, 0, 16, 64);
+        }
+        ctx.fillStyle = 'rgba(27,42,92,0.18)';
+        ctx.fillRect(0, 52, 128, 12);
+    });
+    tex.wrapS = THREE.RepeatWrapping;
+    return tex;
+}
+
+/** Concourse floor: big pale tiles with soft grout lines. */
+export function floorTexture(): THREE.CanvasTexture {
+    const tex = canvasTexture(256, 256, (ctx) => {
+        ctx.fillStyle = '#dfe7f3';
+        ctx.fillRect(0, 0, 256, 256);
+        ctx.fillStyle = '#d2dcec';
+        ctx.fillRect(0, 0, 128, 128);
+        ctx.fillRect(128, 128, 128, 128);
+        ctx.fillStyle = 'rgba(27,42,92,0.12)';
+        ctx.fillRect(0, 0, 256, 3);
+        ctx.fillRect(0, 128, 256, 3);
+        ctx.fillRect(0, 0, 3, 256);
+        ctx.fillRect(128, 0, 3, 256);
+    });
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+}

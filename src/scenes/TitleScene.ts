@@ -65,7 +65,7 @@ export class TitleScene extends Phaser.Scene {
             fontSize: 64,
             pulse: true
         });
-        createButton(this, cx, 1196, 'CLUB', () => this.scene.start('Club'), { width: 260, height: 78, fontSize: 36, color: COLORS.buttonAccent });
+        createButton(this, cx, 1196, 'CLUB', () => this.scene.start('Stadium'), { width: 260, height: 78, fontSize: 36, color: COLORS.buttonAccent });
 
         // Fine to call every time the title shows; only the first call goes through.
         Playables.gameReady();

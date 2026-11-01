@@ -5,7 +5,7 @@ import * as Phaser from 'phaser';
 import type { GameOverData } from '../scenes/GameOverScene';
 import type { LevelCompleteData } from '../scenes/LevelCompleteScene';
 
-const SCENES = ['Title', 'Shop', 'Club', 'Game', 'LevelComplete', 'GameOver'] as const;
+const SCENES = ['Title', 'Shop', 'Stadium', 'Game', 'LevelComplete', 'GameOver'] as const;
 type SceneKey = (typeof SCENES)[number];
 
 /** Starts the scene named in the URL; returns false if there is none. */
@@ -29,7 +29,8 @@ export function devStartScene(boot: Phaser.Scene): boolean {
         });
         boot.scene.start('Game', { level });
     } else {
-        boot.scene.start(key, { level });
+        // ?scene=Stadium&stall=scout opens straight at that stall.
+        boot.scene.start(key, { level, booth: params.get('stall') ?? undefined });
     }
     return true;
 }

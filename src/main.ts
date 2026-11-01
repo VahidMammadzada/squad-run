@@ -5,8 +5,9 @@ import { BootScene } from './scenes/BootScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { GameScene } from './scenes/GameScene';
 import { LevelCompleteScene } from './scenes/LevelCompleteScene';
-import { ClubScene } from './scenes/ClubScene';
 import { ShopScene } from './scenes/ShopScene';
+import { StadiumScene } from './scenes/StadiumScene';
+import { StallPanelScene } from './scenes/StallPanelScene';
 import { TitleScene } from './scenes/TitleScene';
 import { Playables } from './sdk/Playables';
 import { Progress } from './state/Progress';
@@ -43,7 +44,7 @@ void Promise.all([sdkReady, fontReady]).then(() => Playables.boot(() => {
         audio: { noAudio: true },
         disableContextMenu: true,
         banner: false,
-        scene: [BootScene, TitleScene, GameScene, LevelCompleteScene, GameOverScene, ShopScene, ClubScene]
+        scene: [BootScene, TitleScene, GameScene, LevelCompleteScene, GameOverScene, ShopScene, StadiumScene, StallPanelScene]
     });
     Stage.attach(game);
     // Dev only: lets scripts/capture.mjs see which scenes are running.

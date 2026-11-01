@@ -1,10 +1,11 @@
 // Shared building blocks for the club booths (ClubScene, clubStars, clubOffice).
 import * as Phaser from 'phaser';
 import { TEX } from '../art/textures';
+import type { StallId } from '../club/concourse';
 import { COLORS } from '../config';
 import { drawCandy, textStyle } from '../ui/widgets';
 
-export type Booth = 'squad' | 'scout' | 'doctor' | 'training' | 'merch' | 'office';
+export type Booth = StallId;
 
 /** Top of the area below the booth tabs. */
 export const CONTENT_Y = 450;
@@ -16,6 +17,10 @@ export interface ClubHost {
     showBooth(booth: Booth): void;
     isLeaving(): boolean;
     coinsChanged(): void;
+    /** Leaves the scene (e.g. to the kit shop); ignored if already leaving. */
+    leave(go: () => void): void;
+    /** Screen position of the coin counter, for flying-coin effects. */
+    coinTarget: { x: number; y: number };
 }
 
 export const INK = '#1b2a5c';
