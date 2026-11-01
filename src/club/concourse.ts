@@ -37,8 +37,9 @@ export const CONCOURSE = {
     counterX: 3.1,
     /** Where the manager stands to be served: in front of the counter. */
     serveX: 1.4,
-    /** Being this close to a stall's serve point opens it. */
-    serveRadius: 1.0,
+    /** Standing within this box around a stall's serve point opens it (wide across the walkway, tight along it). */
+    serveHalfX: 0.9,
+    serveHalfZ: 0.6,
     /** Past this z the manager is in the tunnel to the pitch. */
     tunnelZ: -21.5,
     tunnelHalfWidth: 1.3,
@@ -86,7 +87,7 @@ export function stepToward(p: Vec2, target: Vec2, dt: number): { pos: Vec2; arri
 export function stallAt(p: Vec2): StallId | null {
     for (const s of STALLS) {
         const sp = servePoint(s.id);
-        if (Math.hypot(p.x - sp.x, p.z - sp.z) <= CONCOURSE.serveRadius) return s.id;
+        if (Math.abs(p.x - sp.x) <= CONCOURSE.serveHalfX && Math.abs(p.z - sp.z) <= CONCOURSE.serveHalfZ) return s.id;
     }
     return null;
 }

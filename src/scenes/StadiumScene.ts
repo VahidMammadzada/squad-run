@@ -18,6 +18,8 @@ import { startNextLevel } from './nextLevel';
 const DRAG_START = 14;
 /** Joystick radius (px): dragging this far is full speed. */
 const STICK_RADIUS = 80;
+/** Seconds to stand at a stall before its menu opens (so walking past doesn't trigger it). */
+const STALL_DWELL = 0.25;
 /** A touch shorter than this (ms) that didn't drag is a tap. */
 const TAP_MS = 350;
 
@@ -38,6 +40,8 @@ export class StadiumScene extends Phaser.Scene {
     private press: { x: number; y: number; at: number } | null = null;
     /** Stall the manager is standing at; its menu opens once per visit. */
     private atStall: StallId | null = null;
+    /** Seconds spent inside a stall's radius without it having opened yet. */
+    private dwell = 0;
     private panelOpen = false;
     private leaving = false;
     private openOnArrival: StallId | null = null;
@@ -103,7 +107,7 @@ export class StadiumScene extends Phaser.Scene {
             this.press = { x: p.x, y: p.y, at: this.time.now };
         });
         this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
-            if (!this.press || !p.isDown) return;
+            if (!this.press || !p.isDown || this.panelOpen) return;
             const dx = p.x - this.press.x;
             const dy = p.y - this.press.y;
             if (!this.stick && Math.hypot(dx, dy) > DRAG_START) {
@@ -229,6 +233,7 @@ export class StadiumScene extends Phaser.Scene {
     /** Called by StallPanelScene once its sheet has gone. */
     panelClosed(): void {
         this.panelOpen = false;
+        this.releaseTouch();
         this.previewLook(null);
         this.world.setPreview(false);
         this.title.setVisible(true);
@@ -245,10 +250,16 @@ export class StadiumScene extends Phaser.Scene {
         this.world.manager.setLook(managerLook(equip ?? Progress.data.manager, getKit(Progress.data.selectedKit).shirt));
     }
 
+    /** Drops the joystick and any press in progress (the panel swallows the finger's release). */
+    private releaseTouch(): void {
+        this.stick = null;
+        this.press = null;
+    }
+
     private openPanel(stall: StallId): void {
         this.panelOpen = true;
         this.setTarget(null, null);
-        this.stick = null;
+        this.releaseTouch();
         Sfx.play('coin', 1.3);
         // In the locker room the camera swings round to show the manager trying things on.
         if (stall === 'wardrobe') {
@@ -262,6 +273,9 @@ export class StadiumScene extends Phaser.Scene {
     update(_time: number, deltaMs: number): void {
         const dt = Math.min(deltaMs, 50) / 1000;
         const before = this.pos;
+
+        // Safety net: a joystick can't outlive the finger holding it.
+        if ((this.stick || this.press) && !this.input.activePointer.isDown) this.releaseTouch();
 
         if (!this.panelOpen && !this.leaving) {
             const keyDir = this.keys
@@ -281,8 +295,20 @@ export class StadiumScene extends Phaser.Scene {
             let here = stallAt(this.pos);
             if (this.target && this.targetStall && here !== this.targetStall) here = null;
             if (here !== this.atStall) {
-                this.atStall = here;
-                if (here) this.openPanel(here);
+                if (!here) {
+                    this.atStall = null;
+                    this.dwell = 0;
+                } else {
+                    // Walking past doesn't count: stand at the stall for a moment (auto-walk arrivals open at once).
+                    this.dwell += dt;
+                    if (this.dwell >= STALL_DWELL || this.targetStall === here) {
+                        this.atStall = here;
+                        this.dwell = 0;
+                        this.openPanel(here);
+                    }
+                }
+            } else {
+                this.dwell = 0;
             }
             if (this.openOnArrival) {
                 const stall = this.openOnArrival;
