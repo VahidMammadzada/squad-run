@@ -36,11 +36,11 @@ const SECTION = 760;
 const FIRST_GATE = 600;
 
 export function levelLength(level: number): number {
-    return Math.min(3000 + (level - 1) * 350, 9000);
+    return Math.min(3000 + (level - 1) * 250, 6500);
 }
 
 export function levelSpeed(level: number): number {
-    return Math.min(420 + (level - 1) * 18, 760);
+    return Math.min(420 + (level - 1) * 10, 600);
 }
 
 function goodModifier(rng: Rng, level: number): Modifier {
@@ -50,20 +50,22 @@ function goodModifier(rng: Rng, level: number): Modifier {
     return { op: '+', value: rng.int(3, Math.min(5 + level * 2, 40)) };
 }
 
-function badModifier(rng: Rng, level: number): Modifier {
-    if (level >= 2 && rng.chance(0.3)) {
-        return { op: '/', value: level >= 6 && rng.chance(0.25) ? 3 : 2 };
+/** `mild` is for pairs with no good option: a small subtraction, never a halving. */
+function badModifier(rng: Rng, level: number, mild = false): Modifier {
+    if (mild) return { op: '-', value: rng.int(2, Math.min(2 + Math.floor(level / 2), 7)) };
+    if (level >= 4 && rng.chance(0.2)) {
+        return { op: '/', value: 2 };
     }
-    return { op: '-', value: rng.int(2, Math.min(3 + level * 2, 40)) };
+    return { op: '-', value: rng.int(2, Math.min(3 + level, 14)) };
 }
 
 function gatePair(rng: Rng, level: number, first: boolean): [Modifier, Modifier] {
     // From level 3, some pairs offer only a lesser evil. Never the first pair,
     // which the squad reaches at its starting size.
-    const bothBad = !first && level >= 3 && rng.chance(Math.min(0.1 + level * 0.03, 0.4));
+    const bothBad = !first && level >= 3 && rng.chance(Math.min(0.05 + level * 0.01, 0.15));
     const bothGood = !bothBad && rng.chance(0.2);
     const pair: [Modifier, Modifier] = bothBad
-        ? [badModifier(rng, level), badModifier(rng, level)]
+        ? [badModifier(rng, level, true), badModifier(rng, level, true)]
         : bothGood
             ? [goodModifier(rng, level), goodModifier(rng, level)]
             : [goodModifier(rng, level), badModifier(rng, level)];
@@ -71,7 +73,7 @@ function gatePair(rng: Rng, level: number, first: boolean): [Modifier, Modifier]
 }
 
 function defenderLine(rng: Rng, level: number, y: number): DefenderSpec[] {
-    const count = Math.min(1 + Math.floor(level / 3), 4);
+    const count = Math.min(1 + Math.floor(level / 4), 3);
     // Two more slots than defenders so there is always a gap to aim for.
     const slots = count + 2;
     const slotWidth = (PITCH_RIGHT - PITCH_LEFT) / slots;
@@ -79,7 +81,7 @@ function defenderLine(rng: Rng, level: number, y: number): DefenderSpec[] {
     return picked.map((slot) => ({
         x: Math.round(PITCH_LEFT + (slot + 0.5) * slotWidth + rng.int(-15, 15)),
         y: y + rng.int(-50, 50),
-        power: Math.min(1 + Math.floor(level / 3) + rng.int(0, 1), 10)
+        power: Math.min(1 + Math.floor(level / 6) + rng.int(0, 1), 3)
     }));
 }
 

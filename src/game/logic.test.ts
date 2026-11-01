@@ -66,6 +66,20 @@ describe('generateLevel', () => {
         }
     });
 
+    it('keeps difficulty humane: mild no-good-option pairs, capped defender hits', () => {
+        for (let level = 1; level <= 60; level++) {
+            const spec = generateLevel(level);
+            for (const gate of spec.gates) {
+                if (!hasGoodOption(gate)) {
+                    expect(gate.left.op === '-' && gate.right.op === '-').toBe(true);
+                    expect(Math.max(gate.left.value, gate.right.value)).toBeLessThanOrEqual(7);
+                }
+            }
+            expect(Math.max(...spec.defenders.map((d) => d.power))).toBeLessThanOrEqual(3);
+            expect(spec.speed).toBeLessThanOrEqual(600);
+        }
+    });
+
     it('has no defenders in the first section of level 1', () => {
         const spec = generateLevel(1);
         expect(spec.defenders.every((d) => d.y > spec.gates[1].y - 400)).toBe(true);
