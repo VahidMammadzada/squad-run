@@ -220,3 +220,25 @@ describe('Progress office', () => {
         expect(after.candidates[0].popularity).toBe(2);
     });
 });
+
+describe('Progress wardrobe', () => {
+    const fresh = (over: Record<string, unknown> = {}) => freshProgress({ version: 5, level: 3, coins: 500, fans: 0, ...over });
+
+    it('buys and wears an item, then re-wears it for free', async () => {
+        const Progress = await fresh();
+        expect(Progress.wearItem('hat-cap')).toBe(true);
+        expect(Progress.data.coins).toBe(350);
+        expect(Progress.data.manager).toMatchObject({ hat: 'cap', owned: ['hat-cap'] });
+        Progress.wearItem('hat-none');
+        expect(Progress.wearItem('hat-cap')).toBe(true);
+        expect(Progress.data.coins).toBe(350);
+    });
+
+    it('refuses what the club cannot afford or has not earned', async () => {
+        const Progress = await fresh();
+        expect(Progress.wearItem('outfit-coat')).toBe(false);
+        expect(Progress.wearItem('hat-tophat')).toBe(false);
+        expect(Progress.wearItem('nope')).toBe(false);
+        expect(Progress.data.manager.hat).toBe('none');
+    });
+});

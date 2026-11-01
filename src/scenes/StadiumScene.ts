@@ -5,6 +5,7 @@ import { CONCOURSE, headingOf, inTunnel, servePoint, stallAt, STALLS, stepToward
 import { crowdFill } from '../club/fans';
 import { canUpgradeStadium } from '../club/office';
 import { starLook } from '../club/runModifiers';
+import { managerLook, type ManagerEquip } from '../club/wardrobe';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { getKit } from '../data/kits';
 import { Progress } from '../state/Progress';
@@ -44,6 +45,7 @@ export class StadiumScene extends Phaser.Scene {
     private fanText!: Phaser.GameObjects.Text;
     private bubbles = new Map<StallId, Phaser.GameObjects.Container>();
     private keys?: Phaser.Types.Input.Keyboard.CursorKeys;
+    private title!: Phaser.GameObjects.Text;
 
     constructor() {
         super('Stadium');
@@ -75,7 +77,8 @@ export class StadiumScene extends Phaser.Scene {
             kitColor: kit.shirt,
             stadiumTier,
             crowdFill: crowdFill(fans),
-            stars: roster.map((star) => ({ star, look: starLook(star) }))
+            stars: roster.map((star) => ({ star, look: starLook(star) })),
+            look: managerLook(Progress.data.manager, kit.shirt)
         });
         this.world.snapCamera(this.pos);
         Stage.show();
@@ -129,7 +132,7 @@ export class StadiumScene extends Phaser.Scene {
         this.coinText = this.add.text(GAME_WIDTH - 40, 58, '', textStyle(36)).setOrigin(1, 0.5).setDepth(21);
         this.add.image(58, 58, TEX.fan).setScale(1.25).setDepth(21);
         this.fanText = this.add.text(190, 58, '', textStyle(36, '#ff8fb6')).setOrigin(1, 0.5).setDepth(21);
-        this.add.text(GAME_WIDTH / 2, 132, 'MY STADIUM', textStyle(44)).setOrigin(0.5).setDepth(21).setAngle(-2);
+        this.title = this.add.text(GAME_WIDTH / 2, 132, 'MY STADIUM', textStyle(44)).setOrigin(0.5).setDepth(21).setAngle(-2);
 
         createButton(this, 120, 1192, 'MENU', () => this.leave(() => this.scene.start('Title')), {
             width: 180,
@@ -221,7 +224,15 @@ export class StadiumScene extends Phaser.Scene {
     /** Called by StallPanelScene once its sheet has gone. */
     panelClosed(): void {
         this.panelOpen = false;
+        this.previewLook(null);
+        this.world.setPreview(false);
+        this.title.setVisible(true);
         this.refreshHud();
+    }
+
+    /** Dresses the manager in a try-on (null = what's saved). */
+    previewLook(equip: ManagerEquip | null): void {
+        this.world.manager.setLook(managerLook(equip ?? Progress.data.manager, getKit(Progress.data.selectedKit).shirt));
     }
 
     private openPanel(stall: StallId): void {
@@ -229,6 +240,12 @@ export class StadiumScene extends Phaser.Scene {
         this.setTarget(null, null);
         this.stick = null;
         Sfx.play('coin', 1.3);
+        // In the locker room the camera swings round to show the manager trying things on.
+        if (stall === 'wardrobe') {
+            this.world.setPreview(true);
+            this.heading = 0;
+            this.title.setVisible(false);
+        }
         this.scene.launch('StallPanel', { stall });
     }
 

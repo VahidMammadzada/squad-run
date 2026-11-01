@@ -16,10 +16,11 @@ import { migratedFans } from '../club/fans';
 import type { Campaign } from '../club/office';
 import type { StarPlayer } from '../club/stars';
 import { maxLevel } from '../club/upgrades';
+import { defaultManager, sanitizeManager, type ManagerState } from '../club/wardrobe';
 import { DEFAULT_KIT, KITS } from '../data/kits';
 
 /** Bump when the shape changes, and teach sanitizeSave to read the old shape. */
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export interface SaveData {
     version: number;
@@ -47,6 +48,8 @@ export interface SaveData {
     stadiumTier: number;
     /** Running marketing campaign, if any. */
     campaign: Campaign | null;
+    /** The manager's look and bought wardrobe items. */
+    manager: ManagerState;
 }
 
 export interface TransferList {
@@ -74,7 +77,8 @@ export function defaultSave(): SaveData {
         transfer: null,
         scoutSeed: 1,
         stadiumTier: 1,
-        campaign: null
+        campaign: null,
+        manager: defaultManager()
     };
 }
 
@@ -135,6 +139,9 @@ export function sanitizeSave(raw: unknown): SaveData {
             save.campaign = { id: c.id as CampaignId, levelsLeft, extended: c.extended === true };
         }
     }
+
+    // v5: the manager. Older saves get the default look.
+    save.manager = sanitizeManager(r.manager);
     return save;
 }
 

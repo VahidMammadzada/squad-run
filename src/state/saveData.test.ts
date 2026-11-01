@@ -73,4 +73,10 @@ describe('sanitizeSave', () => {
         expect(sanitizeSave({ campaign: { id: 'bogus', levelsLeft: 2 } }).campaign).toBeNull();
         expect(sanitizeSave({ campaign: { id: 'fanDrive', levelsLeft: 0 } }).campaign).toBeNull();
     });
+
+    it('gives older saves the default manager and repairs a v5 one', () => {
+        expect(sanitizeSave({ version: 4, level: 3 }).manager.outfit).toBe('tracksuit');
+        const m = sanitizeSave({ manager: { owned: ['hat-cap'], hat: 'cap', outfit: 'suit' } }).manager;
+        expect(m).toMatchObject({ hat: 'cap', outfit: 'tracksuit', owned: ['hat-cap'] });
+    });
 });

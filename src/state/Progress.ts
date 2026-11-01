@@ -13,6 +13,7 @@ import {
 } from '../club/office';
 import { canBuy, nextPrice } from '../club/upgrades';
 import { canSign, generateCandidates, releaseRefund, starPrice, tickRun, type StarPlayer } from '../club/stars';
+import { canBuyItem, wardrobeItem } from '../club/wardrobe';
 import { getKit } from '../data/kits';
 import { Playables } from '../sdk/Playables';
 import { defaultSave, sanitizeSave, type SaveData, type TransferList } from './saveData';
@@ -169,6 +170,21 @@ export const Progress = {
         const extended = extendCampaign(data.campaign);
         if (!extended) return false;
         data.campaign = extended;
+        void this.save();
+        return true;
+    },
+
+    /** Buys a wardrobe item (if needed) and puts it on. Returns false if it can't be had. */
+    wearItem(id: string): boolean {
+        const w = wardrobeItem(id);
+        if (!w) return false;
+        const check = canBuyItem(data.manager, w, data.coins, data.fans);
+        if (check === 'fans' || check === 'coins') return false;
+        if (check === 'ok') {
+            data.coins -= w.price;
+            data.manager.owned.push(w.id);
+        }
+        (data.manager as unknown as Record<string, unknown>)[w.slot] = w.value;
         void this.save();
         return true;
     },

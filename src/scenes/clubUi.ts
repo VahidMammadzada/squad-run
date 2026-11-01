@@ -2,6 +2,7 @@
 import * as Phaser from 'phaser';
 import { TEX } from '../art/textures';
 import type { StallId } from '../club/concourse';
+import type { CelebrationId, ManagerEquip } from '../club/wardrobe';
 import { COLORS } from '../config';
 import { drawCandy, textStyle } from '../ui/widgets';
 
@@ -21,6 +22,10 @@ export interface ClubHost {
     leave(go: () => void): void;
     /** Screen position of the coin counter, for flying-coin effects. */
     coinTarget: { x: number; y: number };
+    /** Dresses the 3D manager in a try-on look (null = back to what's saved). */
+    preview?(equip: ManagerEquip | null): void;
+    /** Plays a celebration on the 3D manager. */
+    celebrate?(id: CelebrationId): void;
 }
 
 export const INK = '#1b2a5c';

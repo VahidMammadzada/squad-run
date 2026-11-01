@@ -2,7 +2,7 @@
 // (x across, z along the walkway; the tunnel to the pitch is at negative z).
 // Pure, so the walking rules are unit tested; src/three/ConcourseWorld draws it.
 
-export type StallId = 'squad' | 'scout' | 'doctor' | 'training' | 'merch' | 'office';
+export type StallId = 'squad' | 'scout' | 'doctor' | 'training' | 'merch' | 'office' | 'wardrobe';
 
 export interface Vec2 {
     x: number;
@@ -23,7 +23,9 @@ export const STALLS: readonly StallDef[] = [
     { id: 'doctor', label: 'DOCTOR', side: -1, z: -17 },
     { id: 'training', label: 'TRAINING', side: 1, z: -5 },
     { id: 'merch', label: 'MERCH', side: 1, z: -11 },
-    { id: 'office', label: 'OFFICE', side: 1, z: -17 }
+    { id: 'office', label: 'OFFICE', side: 1, z: -17 },
+    // The manager's wardrobe, right by the entrance.
+    { id: 'wardrobe', label: 'LOCKER ROOM', side: -1, z: 0.2 }
 ];
 
 export const CONCOURSE = {

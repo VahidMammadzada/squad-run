@@ -7,11 +7,14 @@ import { buildMerch } from './clubMerch';
 import { buildOffice } from './clubOffice';
 import { buildDoctor, buildScout, buildSquad } from './clubStars';
 import { buildTraining } from './clubTraining';
+import { buildWardrobe, resetWardrobe } from './clubWardrobe';
 import type { ClubHost } from './clubUi';
 import type { StadiumScene } from './StadiumScene';
 
 /** Top of the sheet; the concourse stays visible (dimmed) above it. */
 const SHEET_TOP = 360;
+/** The wardrobe sheet is shorter, so the manager can be seen trying things on. */
+const WARDROBE_TOP = 620;
 
 /**
  * A stall's menu, shown as a bottom sheet over the walkable stadium. It reuses
@@ -24,6 +27,7 @@ export class StallPanelScene extends Phaser.Scene {
     private content?: Phaser.GameObjects.Container;
     private closing = false;
     private leaving = false;
+    private top = SHEET_TOP;
 
     constructor() {
         super('StallPanel');
@@ -34,6 +38,8 @@ export class StallPanelScene extends Phaser.Scene {
         this.closing = false;
         this.leaving = false;
         this.content = undefined;
+        this.top = data.stall === 'wardrobe' ? WARDROBE_TOP : SHEET_TOP;
+        if (data.stall === 'wardrobe') resetWardrobe();
     }
 
     private get stadium(): StadiumScene {
@@ -42,18 +48,19 @@ export class StallPanelScene extends Phaser.Scene {
 
     create(): void {
         // Tapping the dimmed concourse above the sheet closes it.
-        const dim = this.add.rectangle(0, 0, GAME_WIDTH, SHEET_TOP, COLORS.ink, 0.35).setOrigin(0).setInteractive();
+        const top = this.top;
+        const dim = this.add.rectangle(0, 0, GAME_WIDTH, top, COLORS.ink, this.stall === 'wardrobe' ? 0 : 0.35).setOrigin(0).setInteractive();
         dim.on('pointerup', () => this.close());
 
         const bg = this.add.graphics();
-        bg.fillStyle(0x000000, 0.25).fillRoundedRect(0, SHEET_TOP - 10, GAME_WIDTH, GAME_HEIGHT, 36);
-        bg.fillStyle(COLORS.bg).fillRoundedRect(0, SHEET_TOP, GAME_WIDTH, GAME_HEIGHT, 36);
-        bg.lineStyle(6, 0xffffff).strokeRoundedRect(3, SHEET_TOP + 3, GAME_WIDTH - 6, GAME_HEIGHT, 34);
+        bg.fillStyle(0x000000, 0.25).fillRoundedRect(0, top - 10, GAME_WIDTH, GAME_HEIGHT, 36);
+        bg.fillStyle(COLORS.bg).fillRoundedRect(0, top, GAME_WIDTH, GAME_HEIGHT, 36);
+        bg.lineStyle(6, 0xffffff).strokeRoundedRect(3, top + 3, GAME_WIDTH - 6, GAME_HEIGHT, 34);
         // The sheet swallows taps so they don't reach the concourse.
-        const blocker = this.add.rectangle(0, SHEET_TOP, GAME_WIDTH, GAME_HEIGHT - SHEET_TOP, 0, 0).setOrigin(0).setInteractive();
-        const title = this.add.text(36, SHEET_TOP + 46, stallDef(this.stall).label, textStyle(44)).setOrigin(0, 0.5);
+        const blocker = this.add.rectangle(0, top, GAME_WIDTH, GAME_HEIGHT - top, 0, 0).setOrigin(0).setInteractive();
+        const title = this.add.text(36, top + 46, stallDef(this.stall).label, textStyle(44)).setOrigin(0, 0.5);
 
-        const close = this.add.container(GAME_WIDTH - 56, SHEET_TOP + 46);
+        const close = this.add.container(GAME_WIDTH - 56, top + 46);
         const cg = this.add.graphics();
         cg.fillStyle(COLORS.ink, 0.35).fillCircle(0, 4, 30);
         cg.fillStyle(COLORS.gateBad).fillCircle(0, 0, 30);
@@ -62,7 +69,7 @@ export class StallPanelScene extends Phaser.Scene {
         close.setSize(64, 64).setInteractive({ useHandCursor: true });
         close.on('pointerup', () => this.close());
 
-        this.sheet = this.add.container(0, GAME_HEIGHT - SHEET_TOP, [bg, blocker, title, close]);
+        this.sheet = this.add.container(0, GAME_HEIGHT - top, [bg, blocker, title, close]);
         this.tweens.add({ targets: this.sheet, y: 0, duration: 240, ease: 'Back.easeOut' });
         this.refresh();
     }
@@ -84,7 +91,8 @@ export class StallPanelScene extends Phaser.Scene {
                 this.scene.stop('Stadium');
                 go();
             },
-            coinTarget: this.stadium.coinTarget
+            coinTarget: this.stadium.coinTarget,
+            preview: (equip) => this.stadium.previewLook(equip)
         };
     }
 
@@ -112,6 +120,9 @@ export class StallPanelScene extends Phaser.Scene {
             case 'office':
                 buildOffice(host, this.content);
                 break;
+            case 'wardrobe':
+                buildWardrobe(host, this.content, this.top);
+                break;
         }
         this.stadium.refreshHud();
     }
@@ -123,7 +134,7 @@ export class StallPanelScene extends Phaser.Scene {
         Sfx.play('click');
         this.tweens.add({
             targets: this.sheet,
-            y: GAME_HEIGHT - SHEET_TOP,
+            y: GAME_HEIGHT - this.top,
             duration: 180,
             ease: 'Quad.easeIn',
             onComplete: () => {

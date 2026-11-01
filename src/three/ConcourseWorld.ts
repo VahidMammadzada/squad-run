@@ -3,7 +3,7 @@ import { CONCOURSE, STALLS, type StallId, type Vec2 } from '../club/concourse';
 import type { StarPlayer } from '../club/stars';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { FigureBatch, makePose, type Pose } from './FigureBatch';
-import { DEFAULT_LOOK, ManagerView, type ManagerLook } from './ManagerView';
+import { defaultLook, ManagerView, type ManagerLook } from './ManagerView';
 import { Stage } from './Stage';
 import { awningTexture, crowdTexture, floorTexture, pitchTexture, stallSignTexture } from './textures';
 
@@ -14,7 +14,8 @@ const STALL_COLORS: Record<StallId, number> = {
     doctor: COLORS.gateBad,
     training: COLORS.buttonAccent,
     merch: 0,
-    office: 0x8e44ad
+    office: 0x8e44ad,
+    wardrobe: 0x00a884
 };
 
 /** Vendor shirt per stall (the doctor wears white, the coach a tracksuit...). */
@@ -24,7 +25,8 @@ const VENDOR_SHIRTS: Record<StallId, number> = {
     doctor: 0xffffff,
     training: 0xff9f1a,
     merch: 0,
-    office: 0x37474f
+    office: 0x37474f,
+    wardrobe: 0xffffff
 };
 
 const WALL_X = CONCOURSE.counterX + 1.5;
@@ -62,6 +64,8 @@ export class ConcourseWorld {
     private readonly camTarget = new THREE.Vector3();
     private readonly v = new THREE.Vector3();
     private time = 0;
+    /** Wardrobe preview: the camera faces the manager from the front. */
+    private previewMode = false;
 
     constructor(opts: ConcourseOptions) {
         const colors = { ...STALL_COLORS, merch: opts.kitColor };
@@ -88,7 +92,7 @@ export class ConcourseWorld {
         this.buildTunnel(opts.kitColor);
         this.buildStars(opts.stars);
 
-        this.manager = new ManagerView(opts.look ?? { ...DEFAULT_LOOK, top: opts.kitColor });
+        this.manager = new ManagerView(opts.look ?? defaultLook(opts.kitColor));
         this.scene.add(this.manager.group);
     }
 
@@ -222,11 +226,23 @@ export class ConcourseWorld {
             batch.draw([pose]);
         }
 
-        // High three-quarter camera behind the manager, eased.
-        this.camTarget.set(pos.x * 0.4, CAM_HEIGHT, Math.min(pos.z + CAM_BACK, FLOOR_NEAR + 1));
-        this.camera.position.lerp(this.camTarget, 1 - Math.exp(-6 * dt));
-        this.camera.lookAt(this.camera.position.x * 0.5, 0.9, this.camera.position.z - CAM_BACK - 5);
+        if (this.previewMode) {
+            // In front of the manager, low, aimed below them so they sit in the top half
+            // of the screen above the wardrobe sheet.
+            this.camTarget.set(pos.x, 1.45, pos.z - 5);
+            this.camera.position.lerp(this.camTarget, 1 - Math.exp(-8 * dt));
+            this.camera.lookAt(pos.x, -0.15, pos.z);
+        } else {
+            // High three-quarter camera behind the manager, eased.
+            this.camTarget.set(pos.x * 0.4, CAM_HEIGHT, Math.min(pos.z + CAM_BACK, FLOOR_NEAR + 1));
+            this.camera.position.lerp(this.camTarget, 1 - Math.exp(-6 * dt));
+            this.camera.lookAt(this.camera.position.x * 0.5, 0.9, this.camera.position.z - CAM_BACK - 5);
+        }
         Stage.render(this.scene, this.camera);
+    }
+
+    setPreview(on: boolean): void {
+        this.previewMode = on;
     }
 
     /** Puts the camera straight at its resting spot (no ease), e.g. on arrival. */
