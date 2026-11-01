@@ -1,9 +1,11 @@
 import * as Phaser from 'phaser';
 import * as THREE from 'three';
+import type { CelebrationId } from '../club/wardrobe';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH, MAX_VISIBLE_MATES, PITCH_CENTER, PITCH_LEFT, PITCH_RIGHT } from '../config';
 import type { LevelSpec } from '../game/levelGen';
 import { isGood, modifierLabel, type Modifier } from '../game/modifiers';
 import { FigureBatch, makePose, type Pose } from './FigureBatch';
+import { ManagerView, type ManagerLook } from './ManagerView';
 import { Particles } from './Particles';
 import { SquadView } from './SquadView';
 import { Stage } from './Stage';
@@ -61,6 +63,8 @@ export class World3D {
     readonly camera = new THREE.PerspectiveCamera(BASE_FOV, GAME_WIDTH / GAME_HEIGHT, 0.1, 120);
     readonly particles = new Particles();
     readonly squad: SquadView;
+    private manager?: ManagerView;
+    private managerAt = { x: 0, z: 0 };
     /** Distance of the goal line from the start, in pitch pixels. */
     readonly goalDist: number;
 
@@ -90,7 +94,13 @@ export class World3D {
     private readonly s = new THREE.Vector3();
     private readonly up = new THREE.Vector3(0, 1, 0);
 
-    constructor(phaserScene: Phaser.Scene, spec: LevelSpec, kitColor: number, goalDistance: number, options: { crowdFill?: number; leaderLook?: { hair: number; socks: number }; stadiumTier?: number } = {}) {
+    constructor(phaserScene: Phaser.Scene, spec: LevelSpec, kitColor: number, goalDistance: number, options: {
+            crowdFill?: number;
+            leaderLook?: { hair: number; socks: number };
+            stadiumTier?: number;
+            /** The manager on the touchline, level with `dist` (pitch pixels). */
+            manager?: { look: ManagerLook; dist: number };
+        } = {}) {
         this.tweens = phaserScene.tweens;
         this.goalDist = spec.length + goalDistance;
         const goalZ = -units(this.goalDist);
@@ -140,6 +150,14 @@ export class World3D {
 
         this.squad = new SquadView(kitColor, this.ballMaterial, MAX_VISIBLE_MATES, this.particles, options.leaderLook);
         this.scene.add(this.squad.group, this.particles.mesh);
+
+        if (options.manager) {
+            // On the left edge of the pitch beside the penalty box, facing the middle:
+            // inside the narrow portrait frame while the squad lines up to shoot.
+            this.manager = new ManagerView(options.manager.look);
+            this.managerAt = { x: -(PITCH_HALF - 0.45), z: -units(options.manager.dist) - 4.5 };
+            this.scene.add(this.manager.group);
+        }
     }
 
     /**
@@ -363,6 +381,7 @@ export class World3D {
         this.time += dt;
         this.squad.update(dt, squadX, dist, count, running);
         this.particles.update(dt);
+        this.manager?.update(dt, this.managerAt.x, this.managerAt.z, -Math.PI / 2, 0);
 
         for (const d of this.defenders) {
             if (!d.down) d.pose.phase += dt * 2;
@@ -414,6 +433,11 @@ export class World3D {
     shake(seconds: number, strength = 0.25): void {
         this.shakeLeft = seconds;
         this.shakeStrength = strength;
+    }
+
+    /** The manager on the touchline celebrates (e.g. the first goal). */
+    celebrateManager(id: CelebrationId): void {
+        this.manager?.celebrate(this.tweens, id);
     }
 
     /** Final-stretch speed feel: widens the field of view. */

@@ -115,7 +115,7 @@ COMPLETE!`, textStyle(56)).setOrigin(0.5).setLineSpacing(-6);
         if (this.leaving) return;
         this.leaving = true;
         this.scene.stop('Game');
-        this.scene.start('Stadium');
+        this.scene.start('Stadium', { won: this.result.goals > 0 });
     }
 
     private coinShower(): void {

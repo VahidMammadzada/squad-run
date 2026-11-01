@@ -92,7 +92,8 @@ export class StallPanelScene extends Phaser.Scene {
                 go();
             },
             coinTarget: this.stadium.coinTarget,
-            preview: (equip) => this.stadium.previewLook(equip)
+            preview: (equip) => this.stadium.previewLook(equip),
+            celebrate: (id) => this.stadium.celebrate(id)
         };
     }
 

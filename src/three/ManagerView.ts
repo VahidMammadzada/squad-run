@@ -1,5 +1,6 @@
+import type * as Phaser from 'phaser';
 import * as THREE from 'three';
-import { defaultManager, managerLook, type ManagerLook } from '../club/wardrobe';
+import { defaultManager, managerLook, type CelebrationId, type ManagerLook } from '../club/wardrobe';
 
 export type { ManagerLook };
 
@@ -223,6 +224,83 @@ export class ManagerView {
             case 'none':
                 break;
         }
+    }
+
+    /**
+     * Plays a celebration (about a second) with the scene's tweens, so it pauses
+     * with the game. Walking leaves the limbs alone until it's done.
+     */
+    celebrate(tweens: Phaser.Tweens.TweenManager, id: CelebrationId, onDone?: () => void): void {
+        if (this.animating) return;
+        this.animating = true;
+        this.resetPose();
+        const [armL, armR] = this.arms;
+        const [legL, legR] = this.legs;
+        const body = this.body;
+        type Step = { targets: object; duration: number; ease?: string; yoyo?: boolean; repeat?: number } & Record<string, unknown>;
+        const steps: Step[] = [];
+        const UP = 2.8;
+        switch (id) {
+            case 'fistpump':
+                steps.push(
+                    { targets: armR.rotation, z: UP, duration: 160, ease: 'Back.easeOut' },
+                    { targets: armR.rotation, z: 1.9, duration: 140, yoyo: true, repeat: 2 },
+                    { targets: body.position, y: 0.18, duration: 160, yoyo: true, ease: 'Quad.easeOut' }
+                );
+                break;
+            case 'jump':
+                steps.push(
+                    { targets: [armL.rotation, armR.rotation], z: (_t: unknown, _k: string, _v: number, i: number) => (i === 0 ? -UP : UP), duration: 150 },
+                    { targets: body.position, y: 0.55, duration: 220, yoyo: true, repeat: 1, ease: 'Quad.easeOut' }
+                );
+                break;
+            case 'spin':
+                steps.push(
+                    { targets: [armL.rotation, armR.rotation], z: (_t: unknown, _k: string, _v: number, i: number) => (i === 0 ? -1.5 : 1.5), duration: 150 },
+                    { targets: body.rotation, y: Math.PI * 2, duration: 700, ease: 'Cubic.easeInOut' }
+                );
+                break;
+            case 'dance':
+                steps.push(
+                    { targets: [armL.rotation, armR.rotation], z: (_t: unknown, _k: string, _v: number, i: number) => (i === 0 ? -2.2 : 0.4), duration: 160 },
+                    { targets: body.rotation, z: 0.25, duration: 170, yoyo: true, repeat: 3, ease: 'Sine.easeInOut' },
+                    { targets: [armL.rotation, armR.rotation], z: (_t: unknown, _k: string, _v: number, i: number) => (i === 0 ? -0.4 : 2.2), duration: 160 },
+                    { targets: body.rotation, z: -0.25, duration: 170, yoyo: true, repeat: 1, ease: 'Sine.easeInOut' }
+                );
+                break;
+            case 'kneeslide':
+                steps.push(
+                    { targets: [armL.rotation, armR.rotation], z: (_t: unknown, _k: string, _v: number, i: number) => (i === 0 ? -UP : UP), duration: 150 },
+                    { targets: [legL.rotation, legR.rotation], x: (_t: unknown, _k: string, _v: number, i: number) => (i === 0 ? -1.5 : 1.2), duration: 160 },
+                    { targets: body.position, y: -0.22, z: -0.9, duration: 500, ease: 'Quad.easeOut' },
+                    { targets: body.rotation, x: 0.35, duration: 250, yoyo: true }
+                );
+                break;
+            case 'backflip':
+                steps.push(
+                    { targets: [armL.rotation, armR.rotation], z: (_t: unknown, _k: string, _v: number, i: number) => (i === 0 ? -UP : UP), duration: 140 },
+                    { targets: body.position, y: 0.95, duration: 330, yoyo: true, ease: 'Quad.easeOut' }
+                );
+                // The flip itself turns alongside the jump.
+                tweens.add({ targets: body.rotation, x: Math.PI * 2, delay: 140, duration: 640, ease: 'Sine.easeInOut' });
+                break;
+        }
+        steps.push({ targets: body.position, y: body.position.y, duration: 220 });
+        tweens.chain({
+            tweens: steps as unknown as Phaser.Types.Tweens.TweenBuilderConfig[],
+            onComplete: () => {
+                this.resetPose();
+                this.animating = false;
+                onDone?.();
+            }
+        });
+    }
+
+    /** Back to standing: body square, limbs hanging. */
+    private resetPose(): void {
+        this.body.position.set(0, 0, 0);
+        this.body.rotation.set(0, 0, 0);
+        for (const limb of [...this.arms, ...this.legs]) limb.rotation.set(0, 0, 0);
     }
 
     /**

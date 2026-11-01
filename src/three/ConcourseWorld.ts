@@ -3,7 +3,10 @@ import { CONCOURSE, STALLS, type StallId, type Vec2 } from '../club/concourse';
 import type { StarPlayer } from '../club/stars';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { FigureBatch, makePose, type Pose } from './FigureBatch';
+import type * as Phaser from 'phaser';
+import type { CelebrationId } from '../club/wardrobe';
 import { defaultLook, ManagerView, type ManagerLook } from './ManagerView';
+import { Particles } from './Particles';
 import { Stage } from './Stage';
 import { awningTexture, crowdTexture, floorTexture, pitchTexture, stallSignTexture } from './textures';
 
@@ -53,6 +56,7 @@ export class ConcourseWorld {
     readonly scene = new THREE.Scene();
     readonly camera = new THREE.PerspectiveCamera(64, GAME_WIDTH / GAME_HEIGHT, 0.1, 120);
     readonly manager: ManagerView;
+    private readonly particles = new Particles(200);
 
     private readonly vendors: FigureBatch[] = [];
     private readonly vendorPoses: Pose[] = [];
@@ -93,7 +97,14 @@ export class ConcourseWorld {
         this.buildStars(opts.stars);
 
         this.manager = new ManagerView(opts.look ?? defaultLook(opts.kitColor));
-        this.scene.add(this.manager.group);
+        this.scene.add(this.manager.group, this.particles.mesh);
+    }
+
+    /** The manager celebrates, with a burst of confetti. */
+    celebrate(tweens: Phaser.Tweens.TweenManager, id: CelebrationId): void {
+        const p = this.manager.group.position;
+        this.particles.burst(p.x, 1.6, p.z, { count: 50, colors: [0xff3b3b, 0xffd21f, 0x2f8cff, 0x3ddc4a, 0xff5c9e, 0xffffff], speed: 4, up: 5, life: 1.4, gravity: 6, size: 0.12 });
+        this.manager.celebrate(tweens, id);
     }
 
     /** Walls under the stands, with the stands rising behind them in the club's colours. */
@@ -214,6 +225,7 @@ export class ConcourseWorld {
     update(dt: number, pos: Vec2, heading: number, speed: number): void {
         this.time += dt;
         this.manager.update(dt, pos.x, pos.z, heading, speed);
+        this.particles.update(dt);
 
         // Vendors and stars sway gently while they wait.
         this.vendorPoses.forEach((p, i) => {

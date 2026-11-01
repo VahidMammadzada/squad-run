@@ -5,7 +5,7 @@ import { CONCOURSE, headingOf, inTunnel, servePoint, stallAt, STALLS, stepToward
 import { crowdFill } from '../club/fans';
 import { canUpgradeStadium } from '../club/office';
 import { starLook } from '../club/runModifiers';
-import { managerLook, type ManagerEquip } from '../club/wardrobe';
+import { managerLook, type CelebrationId, type ManagerEquip } from '../club/wardrobe';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH } from '../config';
 import { getKit } from '../data/kits';
 import { Progress } from '../state/Progress';
@@ -51,7 +51,11 @@ export class StadiumScene extends Phaser.Scene {
         super('Stadium');
     }
 
-    init(data: { booth?: StallId }): void {
+    /** Just won a level: celebrate on arrival. */
+    private won = false;
+
+    init(data: { booth?: StallId; won?: boolean }): void {
+        this.won = data.won === true;
         this.pos = { ...CONCOURSE.spawn };
         this.heading = 0;
         this.target = null;
@@ -92,6 +96,7 @@ export class StadiumScene extends Phaser.Scene {
         this.stickGfx = this.add.graphics().setDepth(40);
         for (const s of STALLS) this.bubbles.set(s.id, this.add.container(0, 0).setDepth(30));
         this.refreshHud();
+        if (this.won) this.time.delayedCall(450, () => this.celebrate(Progress.data.manager.celebration));
 
         this.input.on('pointerdown', (p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
             if (over.length > 0 || this.panelOpen || this.leaving) return;
@@ -228,6 +233,11 @@ export class StadiumScene extends Phaser.Scene {
         this.world.setPreview(false);
         this.title.setVisible(true);
         this.refreshHud();
+    }
+
+    celebrate(id: CelebrationId): void {
+        Sfx.play('win');
+        this.world.celebrate(this.tweens, id);
     }
 
     /** Dresses the manager in a try-on (null = what's saved). */

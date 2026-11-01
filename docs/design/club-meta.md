@@ -240,3 +240,14 @@ Each milestone ships on its own, and the game stays fully playable after each.
 ## 12. Out of scope
 
 Real-money purchases (not available on Playables yet; reportedly tested in 2027), multiplayer or real trading, real-time timers, real player or club names, and any network calls besides the SDK.
+
+## Stadium and manager (built after M3)
+
+Every level now ends in a **walkable stadium**: the player is the club's manager, walking a concourse with a stall per booth. Decisions (2026-11-01):
+- **Always after every level**: Level Complete continues TO THE STADIUM; PLAY (always on screen) or the tunnel starts the next level. The interstitial check moved there.
+- **Controls**: drag = floating joystick; tap a stall, the tunnel or the floor to auto-walk. Walking up to a stall opens its menu as a bottom sheet; while auto-walking to one stall, stalls passed on the way stay shut.
+- **Manager customization** in the LOCKER ROOM: skin and hair colour (free), hair styles, outfits, hats, accessories and celebrations, priced in coins with fan-gated prestige items (gold suit 2000 fans, top hat 1000, trophy 2500, backflip 1500). Tap to try on, tap again to buy.
+- **Celebrations** play on arrival after a win (with confetti), when tried on, and on the touchline at the first goal of the shootout.
+
+Ideas proposed for later: fans wandering the concourse (autograph tips), a trophy room, club name and badge, a mascot that follows the manager, a daily press conference, talking to stars in person, daily collectibles, seasonal decorations, rival managers visiting before big matches.
+

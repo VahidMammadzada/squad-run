@@ -4,6 +4,7 @@ import { COLORS, PITCH_CENTER, START_SQUAD } from '../config';
 import { crowdFill, fansForLevel } from '../club/fans';
 import { activeStar, runModifiers, starLook, type RunModifiers } from '../club/runModifiers';
 import { rollInjury, type StarPlayer } from '../club/stars';
+import { managerLook } from '../club/wardrobe';
 import { getKit } from '../data/kits';
 import { adPolicy } from '../game/adPolicy';
 import { generateLevel, type LevelSpec } from '../game/levelGen';
@@ -62,6 +63,8 @@ export class GameScene extends Phaser.Scene {
     private mods!: RunModifiers;
     /** Star leading the squad this run, if any. */
     private star: StarPlayer | null = null;
+    /** The touchline manager has celebrated this shootout. */
+    private celebrated = false;
     /** Star Shield not yet spent this run. */
     private shieldReady = false;
     private nameTag?: Phaser.GameObjects.Text;
@@ -91,6 +94,7 @@ export class GameScene extends Phaser.Scene {
         this.coinChain = 0;
         // The tween manager outlives restarts; undo a hit-stop that was cut short.
         this.tweens.timeScale = 1;
+        this.celebrated = false;
     }
 
     create(): void {
@@ -110,7 +114,8 @@ export class GameScene extends Phaser.Scene {
         this.world = new World3D(this, this.spec, kit.shirt, GOAL_DISTANCE, {
             crowdFill: crowdFill(Progress.data.fans),
             leaderLook: this.star ? starLook(this.star) : undefined,
-            stadiumTier: Progress.data.stadiumTier
+            stadiumTier: Progress.data.stadiumTier,
+            manager: { look: managerLook(Progress.data.manager, kit.shirt), dist: this.spec.length + GOAL_DISTANCE - SHOOT_DISTANCE }
         });
         Stage.show();
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -287,6 +292,9 @@ export class GameScene extends Phaser.Scene {
         runShootout(this, this.world, this.squad.count, this.level, this.mods.perGoalDelta, {
             onSquad: (count) => this.setSquadCount(count),
             onScore: (goals) => {
+                // The manager celebrates the first goal on the touchline.
+                if (!this.celebrated) this.world.celebrateManager(Progress.data.manager.celebration);
+                this.celebrated = true;
                 this.hud.showGoals(goals);
                 this.hud.stamp('GOAL!', GOLD);
                 this.world.shake(0.15, 0.2);
