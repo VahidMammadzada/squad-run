@@ -28,6 +28,9 @@ export class BootScene extends Phaser.Scene {
 
         createPlaceholderTextures(this);
         Sfx.init();
-        void Progress.load().then(() => this.scene.start('Title'));
+        void Progress.load().then(async () => {
+            if (import.meta.env.DEV && (await import('../dev/devStart')).devStartScene(this)) return;
+            this.scene.start('Title');
+        });
     }
 }

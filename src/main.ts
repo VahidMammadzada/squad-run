@@ -37,6 +37,8 @@ void sdkReady.then(() => Playables.boot(() => {
         scene: [BootScene, TitleScene, GameScene, LevelCompleteScene, GameOverScene, ShopScene]
     });
     Stage.attach(game);
+    // Dev only: lets scripts/capture.mjs see which scenes are running.
+    if (import.meta.env.DEV) (window as unknown as { __game: Phaser.Game }).__game = game;
 
     Playables.onPause(() => {
         game.pause();
