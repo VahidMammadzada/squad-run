@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { Sfx } from '../audio/Sfx';
 import { COLORS, FONT, GAME_HEIGHT, GAME_WIDTH } from '../config';
+import { setCameraZoom } from './hiDpi';
 
 const css = (hex: number) => `#${hex.toString(16).padStart(6, '0')}`;
 
@@ -129,8 +130,10 @@ export function createPanel(scene: Phaser.Scene, width: number, height: number, 
     g.lineStyle(8, 0xffffff).strokeRoundedRect(x, y, width, height, r);
 
     const cam = scene.cameras.main;
-    cam.setZoom(0.85).fadeIn(160, 27, 42, 92);
-    scene.tweens.add({ targets: cam, zoom: 1, duration: 380, ease: 'Back.easeOut' });
+    const pop = { zoom: 0.85 };
+    setCameraZoom(cam, pop.zoom);
+    cam.fadeIn(160, 27, 42, 92);
+    scene.tweens.add({ targets: pop, zoom: 1, duration: 380, ease: 'Back.easeOut', onUpdate: () => setCameraZoom(cam, pop.zoom) });
 }
 
 export function popIn(scene: Phaser.Scene, target: Phaser.GameObjects.Components.Transform & Phaser.GameObjects.GameObject, delay = 0): void {

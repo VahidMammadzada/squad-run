@@ -31,6 +31,7 @@ The meter in the top-left corner shows:
 - [ ] Tested on an Android phone: model ______ result ______
 - [ ] Tested on an iPhone: model ______ result ______
 - [ ] Phone stays cool enough after 5 minutes of play, with no slowdown
+- [ ] Text and buttons look sharp on the phone (not soft or blurry), in menus, the HUD and the stadium
 - [ ] Stadium touch: drag the joystick into TRAINING and keep your finger down until the menu opens, then lift. Nothing is bought and the menu stays open. Walking slowly past a stall doesn't open it. Tapping the floor beside a counter walks you there and stops.
 
 To jump straight to a heavy scene, run `npm run dev -- --host` instead. On the phone, open `http://<pc-ip>:8080/?fps&scene=Game&level=20` or `?fps&scene=Stadium`. Dev builds are a little slower than production, so use these only to find problem spots, then confirm the numbers with `npm run phone`.
@@ -59,6 +60,9 @@ Lifecycle:
 - [ ] The SDK loads before game code. The Test Suite checks this, and `index.html` loads it first.
 - [ ] `firstFrameReady` fires while the loading screen is visible. `gameReady` fires only once the Title menu can be tapped.
 - [ ] Initial load is under 5 s on a phone. The build is ~0.5 MiB compressed against a 15 MiB recommendation.
+
+Input:
+- [ ] On desktop, Esc closes a stall menu and the Shop. Arrow keys steer in a run and walk in the stadium.
 
 Pause and audio:
 - [ ] Pause from the suite stops the game loop, the 3D rendering and the sound. Resume continues.

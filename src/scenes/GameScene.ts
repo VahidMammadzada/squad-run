@@ -131,13 +131,13 @@ export class GameScene extends Phaser.Scene {
         this.setSquadCount(startSquad);
 
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-            this.dragStartX = pointer.x;
+            this.dragStartX = pointer.worldX;
             this.dragStartTarget = this.squad.targetX;
             this.beginRun();
         });
         this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
             if (!pointer.isDown || this.state !== 'run') return;
-            this.squad.targetX = Squad.clampX(this.dragStartTarget + (pointer.x - this.dragStartX) * STEER_GAIN);
+            this.squad.targetX = Squad.clampX(this.dragStartTarget + (pointer.worldX - this.dragStartX) * STEER_GAIN);
         });
         this.cursors = this.input.keyboard?.createCursorKeys();
     }

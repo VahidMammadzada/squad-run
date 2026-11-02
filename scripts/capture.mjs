@@ -36,7 +36,7 @@ if (!external && !(await isUp())) {
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
 const errors = [];
 try {
-    const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1, locale: 'en-US', hasTouch: false });
+    const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: Number(args.dpr ?? 1), locale: 'en-US', hasTouch: false });
     page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
     page.on('pageerror', (e) => errors.push(String(e)));
 

@@ -1,6 +1,5 @@
 import * as Phaser from 'phaser';
 import { Sfx } from './audio/Sfx';
-import { GAME_HEIGHT, GAME_WIDTH } from './config';
 import { BootScene } from './scenes/BootScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { GameScene } from './scenes/GameScene';
@@ -12,6 +11,7 @@ import { TitleScene } from './scenes/TitleScene';
 import { Playables } from './sdk/Playables';
 import { Progress } from './state/Progress';
 import { Stage } from './three/Stage';
+import { canvasSize, installHiDpi } from './ui/hiDpi';
 import lilitaUrl from './assets/fonts/LilitaOne-Regular.ttf?url';
 
 // Dev only: `?mock` installs a fake SDK with a debug panel. The DEV check is
@@ -32,8 +32,8 @@ void Promise.all([sdkReady, fontReady]).then(() => Playables.boot(() => {
     const game = new Phaser.Game({
         type: Phaser.AUTO,
         parent: 'game',
-        width: GAME_WIDTH,
-        height: GAME_HEIGHT,
+        // Canvas at screen resolution; every camera zooms so game code still sees GAME_WIDTH × GAME_HEIGHT.
+        ...canvasSize(),
         // Transparent so the Three.js gameplay canvas underneath shows through.
         transparent: true,
         scale: {
@@ -46,6 +46,7 @@ void Promise.all([sdkReady, fontReady]).then(() => Playables.boot(() => {
         banner: false,
         scene: [BootScene, TitleScene, GameScene, LevelCompleteScene, GameOverScene, ShopScene, StadiumScene, StallPanelScene]
     });
+    installHiDpi(game);
     Stage.attach(game);
     // `?fps` shows a frame-rate meter, also in production builds, for phone checks.
     if (new URLSearchParams(location.search).has('fps')) void import('./dev/fpsMeter').then((m) => m.installFpsMeter());

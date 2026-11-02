@@ -64,7 +64,10 @@ export class ShopScene extends Phaser.Scene {
             return card;
         });
 
-        createButton(this, cx, 1196, 'BACK', () => this.scene.start(this.back, { booth: 'merch' }), { width: 280, height: 84, color: COLORS.buttonAccent });
+        const back = () => this.scene.start(this.back, { booth: 'merch' });
+        createButton(this, cx, 1196, 'BACK', back, { width: 280, height: 84, color: COLORS.buttonAccent });
+        // Esc works like BACK. Esc isn't captured, so YouTube still sees the key.
+        this.input.keyboard?.once('keydown-ESC', back);
         this.refresh();
     }
 

@@ -117,12 +117,12 @@ export class StadiumScene extends Phaser.Scene {
         this.input.on('pointerdown', (p: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
             // A second finger doesn't take over the joystick.
             if (over.length > 0 || this.panelOpen || this.leaving || this.press) return;
-            this.press = { x: p.x, y: p.y, at: this.time.now, pointerId: p.id };
+            this.press = { x: p.worldX, y: p.worldY, at: this.time.now, pointerId: p.id };
         });
         this.input.on('pointermove', (p: Phaser.Input.Pointer) => {
             if (!this.press || p.id !== this.press.pointerId || !p.isDown || this.panelOpen) return;
-            const dx = p.x - this.press.x;
-            const dy = p.y - this.press.y;
+            const dx = p.worldX - this.press.x;
+            const dy = p.worldY - this.press.y;
             if (!this.stick && Math.hypot(dx, dy) > DRAG_START) {
                 this.stick = { origin: new Phaser.Math.Vector2(this.press.x, this.press.y), vec: { x: 0, z: 0 } };
                 this.target = null;
@@ -142,7 +142,7 @@ export class StadiumScene extends Phaser.Scene {
                 this.stick = null;
                 return;
             }
-            if (press && this.time.now - press.at < TAP_MS) this.tap(p.x, p.y);
+            if (press && this.time.now - press.at < TAP_MS) this.tap(p.worldX, p.worldY);
         });
         this.keys = this.input.keyboard?.createCursorKeys();
     }

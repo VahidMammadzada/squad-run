@@ -51,6 +51,8 @@ export class StallPanelScene extends Phaser.Scene {
         const top = this.top;
         const dim = this.add.rectangle(0, 0, GAME_WIDTH, top, COLORS.ink, this.stall === 'wardrobe' ? 0 : 0.35).setOrigin(0).setInteractive();
         onTap(dim, () => this.close());
+        // Esc closes it too. Esc isn't captured, so YouTube still sees the key.
+        this.input.keyboard?.on('keydown-ESC', () => this.close());
 
         const bg = this.add.graphics();
         bg.fillStyle(0x000000, 0.25).fillRoundedRect(0, top - 10, GAME_WIDTH, GAME_HEIGHT, 36);
